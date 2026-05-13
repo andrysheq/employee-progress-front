@@ -1,0 +1,115 @@
+.login-page {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem var(--page-padding-x);
+  background: linear-gradient(165deg, #faf5ff 0%, var(--color-bg) 45%, #f8fafc 100%);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 22rem;
+  padding: 1.75rem 1.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface);
+  box-shadow: 0 12px 40px rgba(76, 29, 149, 0.08);
+}
+
+.login-card__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.login-card__lead {
+  margin: 0 0 1.25rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.login-field label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.login-field input {
+  font: inherit;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.login-field input:focus {
+  outline: 2px solid rgba(76, 29, 149, 0.25);
+  outline-offset: 1px;
+  border-color: var(--color-accent);
+}
+
+.login-card__error {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.8125rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.login-card__submit {
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.6rem 1rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-banner-text);
+  background: var(--color-accent);
+  border: none;
+  border-radius: var(--radius-sm);
+}
+
+.login-card__submit:hover {
+  filter: brightness(1.05);
+}
+
+.login-card__submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.login-card__footer {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.login-card__footer a {
+  color: var(--color-accent);
+}
+
+.login-back {
+  margin-top: 1.5rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.login-back a {
+  color: var(--color-accent);
+}

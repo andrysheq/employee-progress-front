@@ -17,7 +17,7 @@
 | Сервис | Назначение | Локальный URL (по умолчанию из конфигов) |
 |--------|------------|------------------------------------------|
 | `employee-progress-service` | Основной REST API | `http://localhost:8008/employee-progress` (`D:\javaprojects\employee-progress\employee-progress-service\src\main\resources\application.yaml`) |
-| `users-service` (auth) | JWT, JWKS, issuer | `http://localhost:8001/users` (см. `security.jwt.*` в `application.yaml` backend) |
+| `users-service` (auth) | JWT, JWKS, issuer | `http://localhost:8001/users` (см. `security.jwt.*` в `application.yaml` backend). Во фронте в dev: прокси Vite `/users` → тот же порт, страница входа `/login`. |
 | PostgreSQL | БД backend | `localhost:5436`, БД `employee_progress` (`D:\javaprojects\employee-progress\docker-compose-local-up.yml`) |
 | MinIO | Преподписанные URL для вложений к задачам ИПР | `http://localhost:9000` (настройки `minio.*` в backend) |
 
@@ -32,7 +32,8 @@
 3. **Корреляция:** заголовок `X-Request-ID`. Если клиент отправил UUID — сервер пробрасывает его в ответ; если нет — генерирует. Имеет смысл всегда слать свой UUID с UI для трассировки.
 4. **Ошибки:** пользовательские тексты с backend — на **русском**; при отображении не «переводить» ключи, а показывать текст из ответа (структура ответа уточняется по OpenAPI/фактическим `ApiResult` в backend).
 5. **Идентификация субъекта:** в backend зафиксирован ориентир OU: после полноценного security **не передавать** в теле запросов поля вида `employee_id`/`author_employee_id` для обозначения «текущего пользователя» — брать из JWT (`employee_id` claim, см. `security.jwt.employee-id-claim`). На этапе интеграции сверять актуальные правила в `D:\javaprojects\employee-progress\employee-progress-service\AGENTS.md`.
-6. **Авторизация:** при `security.enabled: true` запросы к API сопровождать **Bearer JWT**, выданным auth-сервисом; audience по умолчанию `employee-progress`. Права проверяются как `hasAuthority('...')` по кодам из таблицы `auth_grant` (см. ниже).
+6. **Контекст компании во фронте:** в JWT выдаётся claim `company_id` (имя настраивается в `users-service` и во фронте — `VITE_JWT_COMPANY_CLAIM`, по умолчанию `company_id`). Для локальной вёрстки без токена допускается fallback `VITE_DEV_COMPANY_ID` (`src/config/companyContext.js`).
+7. **Авторизация:** при `security.enabled: true` запросы к API сопровождать **Bearer JWT**, выданным auth-сервисом; audience по умолчанию `employee-progress`. Права проверяются как `hasAuthority('...')` по кодам из таблицы `auth_grant` (см. ниже).
 
 ## 5) Доменная модель (кратко для UI)
 
@@ -121,7 +122,9 @@ npm install
 npm run dev
 ```
 
-Прокси на API в Vite пока не настроен — при необходимости добавить `server.proxy` на `http://localhost:8008` с path `/employee-progress`, либо выносить base URL в `import.meta.env.VITE_API_BASE_URL`.
+Прокси в Vite настроен: путь `/employee-progress` проксируется на `http://localhost:8008` (см. `vite.config.js`). Дополнительно можно задать абсолютный origin в `VITE_API_BASE_URL` (см. `.env.example`) для production или прямых запросов без прокси.
+
+HTTP-клиент и примеры вызовов: `src/api/`, документация `docs/api-client.md`.
 
 ## 9) Стандарты разработки UI (рекомендации)
 
@@ -129,6 +132,7 @@ npm run dev
 - **Доступность:** подписи к полям форм политик и ИПР, явные статусы и даты периода.
 - **Состояния:** загрузка, пустые списки, ошибки API (текст с сервера + `request_id` для поддержки).
 - **Согласованность с backend:** не дублировать бизнес-валидацию «всерьёз» на клиенте — только UX; источник правды — ответы API.
+- **Визуальный референс и токены:** `docs/ui-style-reference.md` (скриншоты в `docs/ui-screenshots/`), сценарии с отделами — `docs/sequences-departments.md`, зоны по ролям — `docs/ui-roles.md`, этапы внедрения — `docs/frontend-roadmap.md`, HTTP-клиент — `docs/api-client.md`.
 
 ## 10) Связанные документы backend (читать при смене контракта)
 

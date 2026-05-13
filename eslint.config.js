@@ -17,5 +17,9 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // Загрузка данных в useEffect — обычный паттерн; правило слишком строго для клиентских запросов
+      'react-hooks/set-state-in-effect': 'off',
+    },
   },
 ])
