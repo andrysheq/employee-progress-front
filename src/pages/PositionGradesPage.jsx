@@ -12,16 +12,17 @@ import './EntityZone.css'
 function gradeSalaryLine(g) {
   const min = g.salary_min_amount
   const max = g.salary_max_amount
+  const formatMoney = (value) => String(Math.trunc(value)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
   if (min == null && max == null) {
     return null
   }
   if (min != null && max != null) {
-    return `${min}вЂ“${max}`
+    return `${formatMoney(min)}-${formatMoney(max)} RUB`
   }
   if (min != null) {
-    return `РѕС‚ ${min}`
+    return `от ${formatMoney(min)} RUB`
   }
-  return `РґРѕ ${max}`
+  return `до ${formatMoney(max)} RUB`
 }
 
 /**
@@ -532,3 +533,4 @@ export function PositionGradesPage() {
     </article>
   )
 }
+

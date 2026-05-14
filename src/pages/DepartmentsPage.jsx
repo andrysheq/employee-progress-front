@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+﻿import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, departmentsApi, employeesApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
@@ -14,6 +14,7 @@ export function DepartmentsPage() {
   const [error, setError] = useState(/** @type {string | null} */ (null))
   const [items, setItems] = useState(null)
   const [myDepartmentId, setMyDepartmentId] = useState(/** @type {number | null} */ (null))
+  const [employeeNamesById, setEmployeeNamesById] = useState(() => new Map())
 
   const load = useCallback(async () => {
     if (companyId == null) {
@@ -43,6 +44,42 @@ export function DepartmentsPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (companyId == null) {
+      setEmployeeNamesById(new Map())
+      return
+    }
+
+    let cancelled = false
+    employeesApi
+      .fetchEmployeesByCompany(companyId)
+      .then((employees) => {
+        if (cancelled) {
+          return
+        }
+        const map = new Map()
+        if (Array.isArray(employees)) {
+          for (const employee of employees) {
+            const id = Number(employee?.id)
+            const fullName = String(employee?.full_name ?? '').trim()
+            if (Number.isFinite(id) && id > 0 && fullName) {
+              map.set(Math.trunc(id), fullName)
+            }
+          }
+        }
+        setEmployeeNamesById(map)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEmployeeNamesById(new Map())
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [companyId])
 
   useEffect(() => {
     if (employeeIdFromJwt == null) {
@@ -126,7 +163,7 @@ export function DepartmentsPage() {
         </div>
       ) : null}
 
-      {loading ? <p className="entity-zone__loading">Загрузка…</p> : null}
+      {loading ? <p className="entity-zone__loading">Загрузка...</p> : null}
 
       {!loading && companyId != null && items && items.length === 0 ? (
         <p className="entity-zone__empty">Отделы не найдены.</p>
@@ -136,13 +173,19 @@ export function DepartmentsPage() {
         <div className="entity-zone__grid">
           {items.map((d) => {
             const employeesCount = resolveEmployeeCount(d)
+            const directorId = Number(d.director_employee_id)
+            const directorNameFromDepartment = String(d.director_employee_full_name ?? d.director_full_name ?? '').trim()
+            const directorName =
+              directorNameFromDepartment ||
+              (Number.isFinite(directorId) && directorId > 0
+                ? employeeNamesById.get(Math.trunc(directorId)) ?? null
+                : null)
+
             return (
               <article key={d.id} className="entity-zone__card">
                 <div className="entity-zone__card-name">{d.name}</div>
                 <div className="entity-zone__card-meta">
-                  <span className="entity-zone__badge">
-                    Сотрудников: {employeesCount != null ? employeesCount : '—'}
-                  </span>
+                  <span className="entity-zone__badge">Сотрудников: {employeesCount != null ? employeesCount : '—'}</span>
                   <span
                     className={
                       d.is_active
@@ -152,13 +195,11 @@ export function DepartmentsPage() {
                   >
                     {d.is_active ? 'Активен' : 'Неактивен'}
                   </span>
-                  <span className="entity-zone__badge">
-                    {d.director_employee_id != null ? 'Директор назначен' : 'Директор не назначен'}
-                  </span>
                   {myDepartmentId != null && d.id === myDepartmentId ? (
                     <span className="entity-zone__badge entity-zone__badge--self">Ваш отдел</span>
                   ) : null}
                 </div>
+                {directorName ? <div className="entity-zone__card-desc">Директор: {directorName}</div> : null}
               </article>
             )
           })}
