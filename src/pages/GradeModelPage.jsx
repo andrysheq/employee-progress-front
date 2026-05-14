@@ -6,46 +6,12 @@ import './pages.css'
 import './EntityZone.css'
 
 /**
- * @param {import('../api/gradeModel.js').GradeView} g
- */
-function gradeSalaryLine(g) {
-  const min = g.salary_min_amount
-  const max = g.salary_max_amount
-  if (min == null && max == null) {
-    return null
-  }
-  if (min != null && max != null) {
-    return `${min}–${max}`
-  }
-  if (min != null) {
-    return `от ${min}`
-  }
-  return `до ${max}`
-}
-
-/**
  * @param {string} value
  * @returns {string | null}
  */
 function trimToNull(value) {
   const t = value.trim()
   return t.length > 0 ? t : null
-}
-
-/**
- * @param {string} value
- * @returns {number | null}
- */
-function toNullableInt(value) {
-  const t = value.trim()
-  if (!t) {
-    return null
-  }
-  const n = Number(t)
-  if (!Number.isFinite(n) || !Number.isInteger(n)) {
-    throw new Error('Введите целое число')
-  }
-  return n
 }
 
 export function GradeModelPage() {
@@ -62,9 +28,6 @@ export function GradeModelPage() {
   )
   const [positionForm, setPositionForm] = useState(
     /** @type {{ mode: 'create' | 'edit', positionId?: number, code: string, name: string, description: string, isActive: boolean } | null} */ (null),
-  )
-  const [gradeForm, setGradeForm] = useState(
-    /** @type {{ mode: 'create' | 'edit', gradeId?: number, positionId: number, code: string, name: string, description: string, levelOrder: string, salaryMinAmount: string, salaryMaxAmount: string, isActive: boolean } | null} */ (null),
   )
 
   const load = useCallback(async () => {
@@ -97,27 +60,24 @@ export function GradeModelPage() {
   }, [load])
 
   useEffect(() => {
-    const modalOpen = positionForm != null || gradeForm != null
-    if (!modalOpen) {
+    if (!positionForm) {
       return
     }
     const onKeyDown = (ev) => {
       if (ev.key === 'Escape' && !submitting) {
         setPositionForm(null)
-        setGradeForm(null)
         setActionError(null)
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [positionForm, gradeForm, submitting])
+  }, [positionForm, submitting])
 
   const positions = matrix?.positions && Array.isArray(matrix.positions) ? matrix.positions : []
 
   /** @param {import('../api/gradeModel.js').PositionView} p */
   function openEditPosition(p) {
     setActionError(null)
-    setGradeForm(null)
     setPositionForm({
       mode: 'edit',
       positionId: p.id,
@@ -125,41 +85,6 @@ export function GradeModelPage() {
       name: p.name ?? '',
       description: p.description ?? '',
       isActive: Boolean(p.is_active),
-    })
-  }
-
-  /** @param {number} positionId */
-  function openCreateGrade(positionId) {
-    setActionError(null)
-    setPositionForm(null)
-    setGradeForm({
-      mode: 'create',
-      positionId,
-      code: '',
-      name: '',
-      description: '',
-      levelOrder: '',
-      salaryMinAmount: '',
-      salaryMaxAmount: '',
-      isActive: true,
-    })
-  }
-
-  /** @param {import('../api/gradeModel.js').GradeView} g @param {number} positionId */
-  function openEditGrade(g, positionId) {
-    setActionError(null)
-    setPositionForm(null)
-    setGradeForm({
-      mode: 'edit',
-      gradeId: g.id,
-      positionId,
-      code: g.code ?? '',
-      name: g.name ?? '',
-      description: g.description ?? '',
-      levelOrder: g.level_order == null ? '' : String(g.level_order),
-      salaryMinAmount: g.salary_min_amount == null ? '' : String(g.salary_min_amount),
-      salaryMaxAmount: g.salary_max_amount == null ? '' : String(g.salary_max_amount),
-      isActive: Boolean(g.is_active),
     })
   }
 
@@ -203,81 +128,6 @@ export function GradeModelPage() {
     }
   }
 
-  async function handleSaveGrade() {
-    if (!gradeForm || companyId == null) {
-      return
-    }
-    const code = gradeForm.code.trim()
-    const name = gradeForm.name.trim()
-    if (!code || !name) {
-      setActionError('Для грейда обязательны код и название.')
-      return
-    }
-
-    let levelOrder
-    let min
-    let max
-    try {
-      levelOrder = toNullableInt(gradeForm.levelOrder)
-      if (levelOrder == null) {
-        setActionError('Для грейда обязателен порядок.')
-        return
-      }
-      min = toNullableInt(gradeForm.salaryMinAmount)
-      max = toNullableInt(gradeForm.salaryMaxAmount)
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Некорректные числовые поля')
-      return
-    }
-
-    if (min != null && min < 0) {
-      setActionError('Минимальная зарплата не может быть отрицательной.')
-      return
-    }
-    if (max != null && max < 0) {
-      setActionError('Максимальная зарплата не может быть отрицательной.')
-      return
-    }
-    if (min != null && max != null && max < min) {
-      setActionError('Максимальная зарплата должна быть больше или равна минимальной.')
-      return
-    }
-
-    setSubmitting(true)
-    setActionError(null)
-    try {
-      const payload = {
-        position_id: gradeForm.positionId,
-        code,
-        name,
-        level_order: levelOrder,
-        description: trimToNull(gradeForm.description),
-        salary_min_amount: min,
-        salary_max_amount: max,
-        is_active: gradeForm.isActive,
-      }
-
-      if (gradeForm.mode === 'create') {
-        await gradeModelApi.createGrade(companyId, payload)
-      } else {
-        await gradeModelApi.updateGrade(gradeForm.gradeId, payload)
-      }
-
-      setGradeForm(null)
-      await load()
-    } catch (e) {
-      if (e instanceof ApiError) {
-        setActionError(e.message)
-      } else if (e instanceof Error) {
-        setActionError(e.message)
-      } else {
-        setActionError('Не удалось сохранить грейд')
-      }
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   /** @param {number} positionId */
   async function handleDeactivatePosition(positionId) {
     if (!window.confirm('Деактивировать должность?')) {
@@ -288,7 +138,6 @@ export function GradeModelPage() {
     try {
       await gradeModelApi.deactivatePosition(positionId)
       setPositionForm(null)
-      setGradeForm(null)
       await load()
     } catch (e) {
       if (e instanceof ApiError) {
@@ -303,36 +152,11 @@ export function GradeModelPage() {
     }
   }
 
-  /** @param {number} gradeId */
-  async function handleDeactivateGrade(gradeId) {
-    if (!window.confirm('Деактивировать грейд?')) {
-      return
-    }
-    setSubmitting(true)
-    setActionError(null)
-    try {
-      await gradeModelApi.deactivateGrade(gradeId)
-      setGradeForm(null)
-      await load()
-    } catch (e) {
-      if (e instanceof ApiError) {
-        setActionError(e.message)
-      } else if (e instanceof Error) {
-        setActionError(e.message)
-      } else {
-        setActionError('Не удалось деактивировать грейд')
-      }
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   function closeModal() {
     if (submitting) {
       return
     }
     setPositionForm(null)
-    setGradeForm(null)
     setActionError(null)
   }
 
@@ -346,7 +170,6 @@ export function GradeModelPage() {
       </ol>
 
       <h1 className="page__title">Матрица грейдов</h1>
-      <p className="page__lead">Должности и линейки грейдов вашей компании.</p>
 
       {companyId == null ? (
         <div className="entity-zone__error" role="status">
@@ -360,7 +183,7 @@ export function GradeModelPage() {
               checked={onlyActive}
               onChange={(ev) => setOnlyActive(ev.target.checked)}
             />
-            Только активные должности и грейды
+            Только активные должности
           </label>
 
           {canManage ? (
@@ -369,7 +192,6 @@ export function GradeModelPage() {
               className="entity-zone__icon-button"
               onClick={() => {
                 setActionError(null)
-                setGradeForm(null)
                 setPositionForm({
                   mode: 'create',
                   code: '',
@@ -394,7 +216,7 @@ export function GradeModelPage() {
         </div>
       ) : null}
 
-      {actionError && !(positionForm || gradeForm) ? (
+      {actionError && !positionForm ? (
         <div className="entity-zone__error" role="alert">
           {actionError}
         </div>
@@ -410,12 +232,16 @@ export function GradeModelPage() {
         <div className="entity-zone__grid">
           {positions.map((row) => {
             const p = row.position
-            const grades = Array.isArray(row.grades) ? [...row.grades] : []
-            grades.sort((a, b) => (a.level_order ?? 0) - (b.level_order ?? 0))
+            const grades = Array.isArray(row.grades) ? row.grades : []
 
             return (
-              <article key={p.id} className="entity-zone__card">
-                <div className="entity-zone__card-name">{p.name}</div>
+              <article key={p.id} className="entity-zone__card entity-zone__card--panel">
+                <div className="entity-zone__card-head">
+                  <div>
+                    <div className="entity-zone__card-name">{p.name}</div>
+                  </div>
+                </div>
+
                 <div className="entity-zone__card-meta">
                   <span
                     className={
@@ -426,20 +252,15 @@ export function GradeModelPage() {
                   >
                     {p.is_active ? 'Должность активна' : 'Должность неактивна'}
                   </span>
-                  <span className="entity-zone__badge">{grades.length} грейдов</span>
+                  <Link
+                    to={`/grade-model/positions/${p.id}`}
+                    className="entity-zone__badge entity-zone__badge-link"
+                  >
+                    {grades.length} грейдов
+                  </Link>
 
                   {canManage ? (
                     <span className="entity-zone__icon-actions">
-                      <button
-                        type="button"
-                        className="entity-zone__icon-button"
-                        title="Добавить грейд"
-                        aria-label="Добавить грейд"
-                        onClick={() => openCreateGrade(p.id)}
-                        disabled={submitting}
-                      >
-                        +
-                      </button>
                       <button
                         type="button"
                         className="entity-zone__icon-button"
@@ -462,56 +283,6 @@ export function GradeModelPage() {
                       </button>
                     </span>
                   ) : null}
-                </div>
-
-                <div className="entity-zone__matrix-block">
-                  <div className="entity-zone__matrix-block-title">Грейды</div>
-                  <div className="entity-zone__grades-table">
-                    <div className={`entity-zone__grades-head${canManage ? ' entity-zone__grades-head--manage' : ''}`}>
-                      <span>Название</span>
-                      <span>Зарплатная вилка</span>
-                      <span>Порядок</span>
-                      {canManage ? <span>Действия</span> : null}
-                    </div>
-                    {grades.length === 0 ? (
-                      <p className="entity-zone__muted">Грейды не добавлены.</p>
-                    ) : (
-                      grades.map((g) => {
-                        const salary = gradeSalaryLine(g)
-                        return (
-                          <div key={g.id} className={`entity-zone__grades-row${canManage ? ' entity-zone__grades-row--manage' : ''}`}>
-                            <span>{g.name || '—'}</span>
-                            <span>{salary ?? '—'}</span>
-                            <span>{g.level_order ?? '—'}</span>
-                            {canManage ? (
-                              <span className="entity-zone__icon-actions">
-                                <button
-                                  type="button"
-                                  className="entity-zone__icon-button"
-                                  title="Редактировать грейд"
-                                  aria-label="Редактировать грейд"
-                                  onClick={() => openEditGrade(g, p.id)}
-                                  disabled={submitting}
-                                >
-                                  ✎
-                                </button>
-                                <button
-                                  type="button"
-                                  className="entity-zone__icon-button entity-zone__icon-button--danger"
-                                  title="Деактивировать грейд"
-                                  aria-label="Деактивировать грейд"
-                                  onClick={() => void handleDeactivateGrade(g.id)}
-                                  disabled={submitting || !g.is_active}
-                                >
-                                  −
-                                </button>
-                              </span>
-                            ) : null}
-                          </div>
-                        )
-                      })
-                    )}
-                  </div>
                 </div>
               </article>
             )
@@ -581,110 +352,6 @@ export function GradeModelPage() {
                 type="button"
                 className="entity-zone__button entity-zone__button--primary"
                 onClick={handleSavePosition}
-                disabled={submitting}
-              >
-                Сохранить
-              </button>
-              <button type="button" className="entity-zone__button" onClick={closeModal} disabled={submitting}>
-                Отмена
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
-
-      {gradeForm ? (
-        <div className="entity-zone__modal-backdrop" role="presentation" onClick={closeModal}>
-          <section
-            className="entity-zone__modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label={gradeForm.mode === 'create' ? 'Создание грейда' : 'Редактирование грейда'}
-            onClick={(ev) => ev.stopPropagation()}
-          >
-            <div className="entity-zone__modal-head">
-              <h3 className="entity-zone__modal-title">
-                {gradeForm.mode === 'create' ? 'Новый грейд' : 'Редактирование грейда'}
-              </h3>
-              <button
-                type="button"
-                className="entity-zone__icon-button"
-                onClick={closeModal}
-                aria-label="Закрыть"
-                disabled={submitting}
-              >
-                ×
-              </button>
-            </div>
-
-            {actionError ? (
-              <div className="entity-zone__error" role="alert">
-                {actionError}
-              </div>
-            ) : null}
-
-            <div className="entity-zone__filters">
-              <label className="entity-zone__field">
-                <span className="entity-zone__field-label">Код</span>
-                <input
-                  className="entity-zone__input"
-                  value={gradeForm.code}
-                  onChange={(ev) => setGradeForm((f) => (f ? { ...f, code: ev.target.value } : f))}
-                />
-              </label>
-              <label className="entity-zone__field">
-                <span className="entity-zone__field-label">Название</span>
-                <input
-                  className="entity-zone__input"
-                  value={gradeForm.name}
-                  onChange={(ev) => setGradeForm((f) => (f ? { ...f, name: ev.target.value } : f))}
-                />
-              </label>
-              <label className="entity-zone__field">
-                <span className="entity-zone__field-label">Порядок</span>
-                <input
-                  className="entity-zone__input"
-                  type="number"
-                  step="1"
-                  value={gradeForm.levelOrder}
-                  onChange={(ev) => setGradeForm((f) => (f ? { ...f, levelOrder: ev.target.value } : f))}
-                />
-              </label>
-              <label className="entity-zone__field">
-                <span className="entity-zone__field-label">Мин. зарплата</span>
-                <input
-                  className="entity-zone__input"
-                  type="number"
-                  step="1"
-                  value={gradeForm.salaryMinAmount}
-                  onChange={(ev) => setGradeForm((f) => (f ? { ...f, salaryMinAmount: ev.target.value } : f))}
-                />
-              </label>
-              <label className="entity-zone__field">
-                <span className="entity-zone__field-label">Макс. зарплата</span>
-                <input
-                  className="entity-zone__input"
-                  type="number"
-                  step="1"
-                  value={gradeForm.salaryMaxAmount}
-                  onChange={(ev) => setGradeForm((f) => (f ? { ...f, salaryMaxAmount: ev.target.value } : f))}
-                />
-              </label>
-              <label className="entity-zone__field entity-zone__field--wide">
-                <span className="entity-zone__field-label">Описание</span>
-                <input
-                  className="entity-zone__input"
-                  value={gradeForm.description}
-                  onChange={(ev) => setGradeForm((f) => (f ? { ...f, description: ev.target.value } : f))}
-                />
-              </label>
-            </div>
-
-            <div className="entity-zone__actions">
-              <button
-                type="button"
-                className="entity-zone__button entity-zone__button--primary"
-                onClick={handleSaveGrade}
                 disabled={submitting}
               >
                 Сохранить

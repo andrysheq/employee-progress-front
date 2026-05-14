@@ -3,6 +3,7 @@ import { AppShell } from '../layout/AppShell'
 import { LoginPage } from '../pages/LoginPage'
 import { HomePage } from '../pages/HomePage'
 import { GradeModelPage } from '../pages/GradeModelPage'
+import { PositionGradesPage } from '../pages/PositionGradesPage'
 import { DepartmentsPage } from '../pages/DepartmentsPage'
 import { EmployeesPage } from '../pages/EmployeesPage'
 import { PoliciesPage } from '../pages/PoliciesPage'
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: 'grade-model', element: <GradeModelPage /> },
+      { path: 'grade-model/positions/:positionId', element: <PositionGradesPage /> },
       { path: 'departments', element: <DepartmentsPage /> },
       { path: 'employees', element: <EmployeesPage /> },
       { path: 'policies', element: <PoliciesPage /> },
