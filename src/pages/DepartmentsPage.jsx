@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiError, departmentsApi } from '../api/index.js'
+import { ApiError, departmentsApi, employeesApi } from '../api/index.js'
+import { useAuth } from '../auth/useAuth.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import './pages.css'
 import './EntityZone.css'
 
 export function DepartmentsPage() {
   const { companyId } = resolveCompanyId()
+  const { employeeIdFromJwt } = useAuth()
   const [onlyActive, setOnlyActive] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(/** @type {string | null} */ (null))
   const [items, setItems] = useState(null)
+  const [myDepartmentId, setMyDepartmentId] = useState(/** @type {number | null} */ (null))
 
   const load = useCallback(async () => {
     if (companyId == null) {
@@ -41,6 +44,54 @@ export function DepartmentsPage() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    if (employeeIdFromJwt == null) {
+      setMyDepartmentId(null)
+      return
+    }
+
+    let cancelled = false
+    employeesApi
+      .fetchEmployeeById(employeeIdFromJwt)
+      .then((employee) => {
+        if (cancelled) {
+          return
+        }
+        const departmentId = Number(employee?.department_id)
+        setMyDepartmentId(Number.isFinite(departmentId) && departmentId > 0 ? Math.trunc(departmentId) : null)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMyDepartmentId(null)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [employeeIdFromJwt])
+
+  /**
+   * @param {import('../api/departments.js').DepartmentView} department
+   * @returns {number | null}
+   */
+  function resolveEmployeeCount(department) {
+    const candidates = [
+      department.employee_count,
+      department.employees_count,
+      department.employee_total,
+      department.employees_total,
+      department.staff_count,
+    ]
+    for (const value of candidates) {
+      const count = Number(value)
+      if (Number.isFinite(count) && count >= 0) {
+        return Math.trunc(count)
+      }
+    }
+    return null
+  }
+
   return (
     <article className="page">
       <ol className="page__breadcrumbs">
@@ -51,7 +102,6 @@ export function DepartmentsPage() {
       </ol>
 
       <h1 className="page__title">Отделы</h1>
-      <p className="page__lead">Здесь отображаются отделы вашей компании.</p>
 
       {companyId == null ? (
         <div className="entity-zone__error" role="status">
@@ -84,27 +134,34 @@ export function DepartmentsPage() {
 
       {!loading && items && items.length > 0 ? (
         <div className="entity-zone__grid">
-          {items.map((d) => (
-            <article key={d.id} className="entity-zone__card">
-              <div className="entity-zone__card-name">{d.name}</div>
-              <div className="entity-zone__card-code">{d.code}</div>
-              {d.description ? <p className="entity-zone__card-desc">{d.description}</p> : null}
-              <div className="entity-zone__card-meta">
-                <span
-                  className={
-                    d.is_active
-                      ? 'entity-zone__badge entity-zone__badge--active'
-                      : 'entity-zone__badge entity-zone__badge--inactive'
-                  }
-                >
-                  {d.is_active ? 'Активен' : 'Неактивен'}
-                </span>
-                <span className="entity-zone__badge">
-                  {d.director_employee_id != null ? 'Директор назначен' : 'Директор не назначен'}
-                </span>
-              </div>
-            </article>
-          ))}
+          {items.map((d) => {
+            const employeesCount = resolveEmployeeCount(d)
+            return (
+              <article key={d.id} className="entity-zone__card">
+                <div className="entity-zone__card-name">{d.name}</div>
+                <div className="entity-zone__card-meta">
+                  <span className="entity-zone__badge">
+                    Сотрудников: {employeesCount != null ? employeesCount : '—'}
+                  </span>
+                  <span
+                    className={
+                      d.is_active
+                        ? 'entity-zone__badge entity-zone__badge--active'
+                        : 'entity-zone__badge entity-zone__badge--inactive'
+                    }
+                  >
+                    {d.is_active ? 'Активен' : 'Неактивен'}
+                  </span>
+                  <span className="entity-zone__badge">
+                    {d.director_employee_id != null ? 'Директор назначен' : 'Директор не назначен'}
+                  </span>
+                  {myDepartmentId != null && d.id === myDepartmentId ? (
+                    <span className="entity-zone__badge entity-zone__badge--self">Ваш отдел</span>
+                  ) : null}
+                </div>
+              </article>
+            )
+          })}
         </div>
       ) : null}
     </article>

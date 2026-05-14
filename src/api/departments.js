@@ -9,6 +9,11 @@ import { apiGet, apiPatch, apiPost, apiPut } from './client.js'
  * @property {string} [description]
  * @property {number | null} [director_employee_id]
  * @property {boolean} is_active
+ * @property {number} [employee_count]
+ * @property {number} [employees_count]
+ * @property {number} [employee_total]
+ * @property {number} [employees_total]
+ * @property {number} [staff_count]
  */
 
 /**

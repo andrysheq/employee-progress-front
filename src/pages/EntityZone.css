@@ -139,6 +139,11 @@
   color: #b45309;
 }
 
+.entity-zone__badge--self {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .entity-zone__card-desc {
   font-size: 0.8125rem;
   color: var(--color-text-muted);
@@ -473,7 +478,7 @@
 }
 
 .confirm-dialog__button--danger {
-  background: #dc2626;
+  background: var(--color-accent);
   color: #fff;
 }
 
