@@ -71,6 +71,23 @@
   background: #fff;
 }
 
+.entity-zone__card--selected {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.entity-zone__card-select {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
 .entity-zone__card-head {
   display: flex;
   align-items: flex-start;
