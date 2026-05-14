@@ -4,7 +4,7 @@
 
 Веб-клиент (SPA) для **информационной системы карьерного развития и оценки сотрудников IT-компании**: грейдовая модель, политики ревью, индивидуальные планы развития (ИПР), циклы ревью, кадровые решения по повышению, отчёты.
 
-Источник домена и бизнес-процессов: репозиторий backend `D:\javaprojects\employee-progress` (корневой `D:\javaprojects\employee-progress\README.md`, статус реализации `D:\javaprojects\employee-progress\BUSINESS_PROCESSES_IMPLEMENTATION_STATUS.md`).
+Источник домена и бизнес-процессов: репозиторий backend `"D:\javaprojects\employee-progress-back-front\employee-progress"`.
 
 ## 2) Технологический стек (текущий)
 
@@ -46,26 +46,7 @@
 - **Чувствительные данные:** поля вилки зарплаты по грейду для роли сотрудника в продуктовой спецификации **не показывать** (ограничение RBAC на API — см. `D:\javaprojects\employee-progress\employee-progress-service\docs\database-schema-reference.md`, §6).
 
 Подробная схема сущностей: тот же файл `database-schema-reference.md`.
-
-## 6) Основные группы REST API (относительно `/employee-progress`)
-
-Перечень соответствует контроллерам в `employee-progress-service`. Path-параметры везде **snake_case** в URL.
-
-| Префикс | Назначение |
-|---------|------------|
-| `GET/POST/PUT/PATCH/DELETE /grade-model/...` | Матрица компании, должности, грейды, компетенции, критерии грейда |
-| `POST /companies/{company_id}/employees` | Создание сотрудника в компании |
-| `GET /employees/{employee_id}/grade-history`, `.../current-grade`, `POST .../grades` | История и текущий грейд, назначение грейда |
-| `GET/POST/PATCH/DELETE /promotion-policies/...` | Политики ревью/повышения |
-| `GET/POST/PATCH/... /development-plans/...` | ИПР: CRUD плана, статус, задачи, прогресс, комментарии, вложения, строки компетенций |
-| `GET/PATCH/POST /review-cycles/...` | Циклы ревью, промежуточный прогресс, итоговое ревью, решение по повышению, перенос/отмена |
-| `GET /interim-review-assessments/{assessment_id}` | Деталь промежуточной оценки |
-| `GET /promotion-decisions`, `GET /promotion-decisions/{decision_id}` | Кадровые решения |
-| `GET /reports/...` | Отчёты: выполнение ИПР, история решений, сводка эффективности |
-
 Точные сигнатуры и тела — в OpenAPI `/contract` и в исходниках контроллеров пакета `lrm.employeeprogressservice.controller`.
-
-## 7) Роли и полномочия (для маршрутизации UI и запросов)
 
 ### 7.1 Роли JWT / `auth_role` (OU-стиль, title = claim в токене)
 
@@ -80,52 +61,7 @@
 
 В доменной таблице `employee_roles` также встречаются коды `EMPLOYEE`, `TEAM_LEAD`, `PM`, `DIRECTOR`, `HR`, `ADMIN` — это **справочник оргролей сотрудника**, не путать с JWT-ролями OU без явного маппинга в продукте.
 
-### 7.2 Матрица authority → кто имеет (сводка по Flyway V36–V39)
-
-Коды authority совпадают со строками в `@PreAuthorize` на backend. Для детального списка endpoint → authority смотреть контроллеры и `D:\javaprojects\employee-progress\employee-progress-service\src\main\java\lrm\employeeprogressservice\security\OuGrantSpelExpressions.java`.
-
-**Грейдовая модель и сотрудники компании**
-
-- Просмотр матрицы / чтение справочников: все роли 1000–1003 (с ограничениями по данным в сервисе).
-- Изменение должностей/грейдов/компетенций/критериев: **1000, 1001**.
-- `MANAGE_COMPANY_EMPLOYEES`, `MANAGE_EMPLOYEE_ASSIGNED_GRADE`: **1000, 1001**.
-- Чтение истории/текущего грейда: **1000–1003**.
-
-**ИПР**
-
-- `CREATE_DEVELOPMENT_PLAN`, черновик задач, обновление плана и смена статуса плана, удаление вложений, апрув компетенций тимлидом: **1002**.
-- Чтение планов/задач/вложений/истории прогресса/компетенций: **1000–1003** (где выдан грант).
-- `UPDATE_DEVELOPMENT_PLAN_TASK_STATUS`, `RECORD_DEVELOPMENT_PLAN_TASK_PROGRESS`: **1002, 1003** (бизнес-инварианты «кто может закрыть задачу с оценкой» — в сервисе; UI должен не предлагать недоступные действия по 403).
-- Загрузка вложений (upload-url + complete): все **1000–1003**.
-
-**Политики и отчёты**
-
-- Чтение политик: все; **управление** политиками: **1000, 1001**.
-- Отчёт выполнения ИПР и эффективности: **1000, 1001, 1002**; история кадровых решений: **1000, 1001**.
-- Чтение `promotion-decisions`: **1000, 1001**.
-
-**Циклы ревью**
-
-- Детали цикла, промежуточная информация, финальные ревью (чтение): **1000–1003** (где выдано).
-- Список циклов с фильтрами: **1000, 1001, 1002**.
-- Корректировка промежуточного прогресса: **1000, 1001, 1002**.
-- Назначение итогового ревью, кадровое решение, отмена цикла: **1000, 1001**.
-- Перенос цикла: **1000, 1001, 1002**.
-
 На UI: хранить список authority из token introspection / распарсенных `roles` + маппинг grant (если токен отдаёт scopes/authorities — сверить с фактической выдачей users-service) и **скрывать** недоступные кнопки; 403 обрабатывать как «нет права», а не как баг сети.
-
-## 8) Локальный запуск фронта
-
-```bash
-cd D:\reactprojects\employee-progress-front
-npm install
-npm run dev
-```
-
-Прокси в Vite настроен: путь `/employee-progress` проксируется на `http://localhost:8008` (см. `vite.config.js`). Дополнительно можно задать абсолютный origin в `VITE_API_BASE_URL` (см. `.env.example`) для production или прямых запросов без прокси.
-
-HTTP-клиент и примеры вызовов: `src/api/`, документация `docs/api-client.md`.
-
 ## 9) Стандарты разработки UI (рекомендации)
 
 - **Язык интерфейса:** русский, в терминах домена из README backend (ИПР, грейд, ревью, политика).
@@ -133,15 +69,7 @@ HTTP-клиент и примеры вызовов: `src/api/`, документ
 - **Состояния:** загрузка, пустые списки, ошибки API (текст с сервера + `request_id` для поддержки).
 - **Согласованность с backend:** не дублировать бизнес-валидацию «всерьёз» на клиенте — только UX; источник правды — ответы API.
 - **Отображение данных матрицы грейдов:** на пользовательских страницах не показывать поля `code` и `description` у должностей и грейдов; использовать только человекочитаемые названия и рабочие статусы.
-- **Визуальный референс и токены:** `docs/ui-style-reference.md` (скриншоты в `docs/ui-screenshots/`), сценарии с отделами — `docs/sequences-departments.md`, зоны по ролям — `docs/ui-roles.md`, этапы внедрения — `docs/frontend-roadmap.md`, HTTP-клиент — `docs/api-client.md`.
-
-## 10) Связанные документы backend (читать при смене контракта)
-
-- `D:\javaprojects\employee-progress\employee-progress-service\AGENTS.md`
-- `D:\javaprojects\employee-progress\employee-progress-service\docs\api-contract-guidelines.md`
-- `D:\javaprojects\employee-progress\employee-progress-service\docs\database-schema-reference.md`
-- `D:\javaprojects\employee-progress\BUSINESS_PROCESSES_IMPLEMENTATION_STATUS.md`
-
+- **Визуальный референс и токены:** `docs/ui-style-reference.md` (скриншоты в `docs/ui-screenshots/`).
 ---
 
 *Документ создан как стартовая точка для разработки интерфейса; при расхождении с кодом backend приоритет у актуального OpenAPI и Java-контроллеров.*

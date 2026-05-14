@@ -1,4 +1,5 @@
-import { apiGet } from './client.js'
+import { apiGet, apiPost } from './client.js'
+import { buildRegistryQuery, normalizePage } from './registry.js'
 
 /**
  * @typedef {'APPROVED' | 'REJECTED'} PromotionDecisionType
@@ -47,4 +48,39 @@ export function fetchPromotionDecisions(filter = {}) {
   const query = q.toString()
   const path = query ? `/promotion-decisions?${query}` : '/promotion-decisions'
   return /** @type {Promise<PromotionDecisionView[]>} */ (apiGet(path))
+}
+
+/**
+ * @typedef {object} PromotionDecisionRegistryFilter
+ * @property {number | null | undefined} [employee_id]
+ * @property {number | null | undefined} [review_cycle_id]
+ * @property {number | null | undefined} [company_id]
+ * @property {number | null | undefined} [team_lead_id]
+ * @property {number | null | undefined} [decided_by_id]
+ * @property {PromotionDecisionType | null | undefined} [decision_type]
+ * @property {string | null | undefined} [date_from]
+ * @property {string | null | undefined} [date_to]
+ * @property {string | null | undefined} [employee_title_like]
+ */
+
+/**
+ * @typedef {object} RegistryPageOpts
+ * @property {number | null | undefined} [page]
+ * @property {number | null | undefined} [size]
+ * @property {string | null | undefined} [sort]
+ */
+
+/**
+ * @param {PromotionDecisionRegistryFilter} [filter]
+ * @param {RegistryPageOpts} [options]
+ * @returns {Promise<{ content: PromotionDecisionView[], totalElements: number, totalPages: number, size: number, page: number }>}
+ */
+export async function fetchPromotionDecisionsRegistry(filter = {}, options = {}) {
+  const query = buildRegistryQuery({
+    page: options.page ?? 0,
+    size: options.size ?? 100,
+    sort: options.sort ?? 'decidedAt,desc',
+  })
+  const payload = await apiPost(`/promotion-decisions/registry${query}`, filter)
+  return normalizePage(payload)
 }

@@ -1,7 +1,18 @@
-import { mainNavItems } from '../layout/navConfig.js'
+﻿import { mainNavItems } from '../layout/navConfig.js'
 
-/** Роли с полным набором зон навигации (см. docs/ui-roles.md). */
-const DIRECTOR_ROLES = new Set(['Директор отдела', 'Генеральный директор'])
+/** Полный набор зон навигации доступен генеральному директору. */
+const GENERAL_DIRECTOR_ROLES = new Set(['Генеральный директор'])
+
+/** Для директора отдела скрываем Решения и Отчёты. */
+const DEPARTMENT_DIRECTOR_PATHS = new Set([
+  '/',
+  '/grade-model',
+  '/departments',
+  '/employees',
+  '/policies',
+  '/development-plans',
+  '/reviews',
+])
 
 /** Пути для тимлида: без кадровых решений (зона Е). */
 const TEAM_LEAD_PATHS = new Set([
@@ -41,31 +52,44 @@ export function normalizeJwtRoles(raw) {
 }
 
 /**
- * Пункты верхнего меню с учётом ролей из JWT (эвристика по docs/ui-roles.md).
- * Если ролей нет или неизвестны — показываем все пункты (удобно для кастомных токенов).
+ * Пункты верхнего меню с учётом ролей из JWT.
+ * Если роль не распознана, она игнорируется.
+ * Если нет ни одной распознанной роли, показываем полный набор.
  * @param {string[]} roles
  */
 export function getVisibleNavItems(roles) {
-  const list = roles.filter(Boolean)
+  const list = Array.isArray(roles) ? roles.filter(Boolean) : []
   if (list.length === 0) {
     return mainNavItems
   }
-  if (list.some((r) => DIRECTOR_ROLES.has(r))) {
+
+  if (list.some((r) => GENERAL_DIRECTOR_ROLES.has(r))) {
     return mainNavItems
   }
 
   const allowed = new Set()
-  for (const r of list) {
-    if (r === 'Тимлид') {
+  let hasKnownRole = false
+
+  for (const role of list) {
+    if (role === 'Директор отдела') {
+      hasKnownRole = true
+      DEPARTMENT_DIRECTOR_PATHS.forEach((p) => allowed.add(p))
+      continue
+    }
+    if (role === 'Тимлид') {
+      hasKnownRole = true
       TEAM_LEAD_PATHS.forEach((p) => allowed.add(p))
-    } else if (r === 'Сотрудник') {
+      continue
+    }
+    if (role === 'Сотрудник') {
+      hasKnownRole = true
       EMPLOYEE_PATHS.forEach((p) => allowed.add(p))
-    } else {
-      return mainNavItems
     }
   }
-  if (allowed.size === 0) {
+
+  if (!hasKnownRole || allowed.size === 0) {
     return mainNavItems
   }
+
   return mainNavItems.filter((item) => allowed.has(item.to))
 }

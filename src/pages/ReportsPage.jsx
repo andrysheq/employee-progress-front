@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiError, reportsApi } from '../api/index.js'
+import { ApiError, employeesApi, reportsApi } from '../api/index.js'
+import { useAuth } from '../auth/useAuth.js'
+import { hasDirectorRole, hasTeamLeadRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import './pages.css'
 import './EntityZone.css'
@@ -26,21 +28,6 @@ function defaultPeriod() {
   from.setDate(from.getDate() - 90)
   const fmt = (d) => d.toISOString().slice(0, 10)
   return { dateFrom: fmt(from), dateTo: fmt(to) }
-}
-
-/**
- * @param {string} value
- * @returns {number | null}
- */
-function parsePositiveInt(value) {
-  if (!value || value.trim() === '') {
-    return null
-  }
-  const n = Number(value)
-  if (!Number.isFinite(n) || n <= 0) {
-    return null
-  }
-  return Math.trunc(n)
 }
 
 /**
@@ -72,11 +59,21 @@ function formatReportFailure(reason) {
 
 export function ReportsPage() {
   const { companyId } = resolveCompanyId()
+  const { roles } = useAuth()
+  const canReadDirectorReports = hasDirectorRole(roles)
+  const canReadTeamLeadReports = hasTeamLeadRole(roles)
+  const canReadPerformance = canReadDirectorReports || canReadTeamLeadReports
+  const canReadHistory = canReadDirectorReports
+
   const defaultRange = useMemo(() => defaultPeriod(), [])
   const [dateFrom, setDateFrom] = useState(() => defaultRange.dateFrom)
   const [dateTo, setDateTo] = useState(() => defaultRange.dateTo)
-  const [employeeIdInput, setEmployeeIdInput] = useState('')
-  const [teamLeadIdInput, setTeamLeadIdInput] = useState('')
+  const [employeeId, setEmployeeId] = useState('')
+  const [teamLeadId, setTeamLeadId] = useState('')
+
+  const [employees, setEmployees] = useState(
+    /** @type {import('../api/employees.js').EmployeeView[] | null} */ (null),
+  )
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(/** @type {string | null} */ (null))
@@ -93,8 +90,37 @@ export function ReportsPage() {
     /** @type {import('../api/reports.js').PromotionDecisionHistoryReportView | null} */ (null),
   )
 
-  const load = useCallback(async (params) => {
-    if (companyId == null || !params.dateFrom || !params.dateTo) {
+  const loadEmployees = useCallback(async () => {
+    if (companyId == null) {
+      setEmployees(null)
+      return
+    }
+    try {
+      const page = await employeesApi.fetchEmployeesRegistry(
+        { company_id: companyId, is_active: true },
+        { size: 300, sort: 'fullName,asc' },
+      )
+      setEmployees(page.content)
+    } catch {
+      setEmployees(null)
+    }
+  }, [companyId])
+
+  useEffect(() => {
+    void loadEmployees()
+  }, [loadEmployees])
+
+  const sortedEmployees = useMemo(() => {
+    if (!employees) {
+      return []
+    }
+    return [...employees].sort((a, b) =>
+      String(a.full_name ?? '').localeCompare(String(b.full_name ?? ''), 'ru', { sensitivity: 'base' }),
+    )
+  }, [employees])
+
+  const load = useCallback(async () => {
+    if (companyId == null || !dateFrom || !dateTo) {
       setCompletion(null)
       setEffectiveness(null)
       setHistory(null)
@@ -104,61 +130,100 @@ export function ReportsPage() {
       setHistoryError(null)
       return
     }
+    if (!canReadPerformance && !canReadHistory) {
+      setCompletion(null)
+      setEffectiveness(null)
+      setHistory(null)
+      setError('Недостаточно прав для просмотра отчётов')
+      setCompletionError(null)
+      setEffectivenessError(null)
+      setHistoryError(null)
+      return
+    }
+
     const filter = {
       company_id: companyId,
-      date_from: params.dateFrom,
-      date_to: params.dateTo,
-      employee_id: parsePositiveInt(params.employeeIdInput),
-      team_lead_id: parsePositiveInt(params.teamLeadIdInput),
+      date_from: dateFrom,
+      date_to: dateTo,
+      employee_id: employeeId ? Number(employeeId) : null,
+      team_lead_id: teamLeadId ? Number(teamLeadId) : null,
     }
+
     setLoading(true)
     setError(null)
     setCompletionError(null)
     setEffectivenessError(null)
     setHistoryError(null)
-    const settled = await Promise.allSettled([
-      reportsApi.fetchDevelopmentPlansCompletionReport(filter),
-      reportsApi.fetchEffectivenessSummaryReport(filter),
-      reportsApi.fetchPromotionDecisionsHistoryReport(filter),
-    ])
+
+    const completionPromise = canReadPerformance
+      ? reportsApi.fetchDevelopmentPlansCompletionReport(filter)
+      : Promise.resolve(null)
+    const effectivenessPromise = canReadPerformance
+      ? reportsApi.fetchEffectivenessSummaryReport(filter)
+      : Promise.resolve(null)
+    const historyPromise = canReadHistory
+      ? reportsApi.fetchPromotionDecisionsHistoryReport(filter)
+      : Promise.resolve(null)
+
+    const settled = await Promise.allSettled([completionPromise, effectivenessPromise, historyPromise])
     const [c, e, h] = settled
-    if (c.status === 'fulfilled') {
-      setCompletion(/** @type {import('../api/reports.js').DevelopmentPlanCompletionReportView} */ (c.value))
-      setCompletionError(null)
+
+    if (canReadPerformance) {
+      if (c.status === 'fulfilled') {
+        setCompletion(/** @type {import('../api/reports.js').DevelopmentPlanCompletionReportView} */ (c.value))
+      } else {
+        setCompletion(null)
+        setCompletionError(formatReportFailure(c.reason))
+      }
+
+      if (e.status === 'fulfilled') {
+        setEffectiveness(/** @type {import('../api/reports.js').EffectivenessSummaryReportView} */ (e.value))
+      } else {
+        setEffectiveness(null)
+        setEffectivenessError(formatReportFailure(e.reason))
+      }
     } else {
       setCompletion(null)
-      setCompletionError(formatReportFailure(c.reason))
-    }
-    if (e.status === 'fulfilled') {
-      setEffectiveness(/** @type {import('../api/reports.js').EffectivenessSummaryReportView} */ (e.value))
-      setEffectivenessError(null)
-    } else {
       setEffectiveness(null)
-      setEffectivenessError(formatReportFailure(e.reason))
+      setCompletionError(null)
+      setEffectivenessError(null)
     }
-    if (h.status === 'fulfilled') {
-      setHistory(/** @type {import('../api/reports.js').PromotionDecisionHistoryReportView} */ (h.value))
-      setHistoryError(null)
+
+    if (canReadHistory) {
+      if (h.status === 'fulfilled') {
+        setHistory(/** @type {import('../api/reports.js').PromotionDecisionHistoryReportView} */ (h.value))
+      } else {
+        setHistory(null)
+        setHistoryError(formatReportFailure(h.reason))
+      }
     } else {
       setHistory(null)
-      setHistoryError(formatReportFailure(h.reason))
+      setHistoryError(null)
     }
-    if (c.status === 'rejected' && e.status === 'rejected' && h.status === 'rejected') {
-      setError('Ни один отчёт не загрузился. Проверьте права доступа и параметры периода.')
+
+    const allRequestedFailed =
+      (!canReadPerformance || (c.status === 'rejected' && e.status === 'rejected')) &&
+      (!canReadHistory || h.status === 'rejected')
+    if (allRequestedFailed) {
+      setError('Не удалось загрузить отчёты. Проверьте права доступа и параметры периода.')
     } else {
       setError(null)
     }
+
     setLoading(false)
-  }, [companyId])
+  }, [
+    canReadHistory,
+    canReadPerformance,
+    companyId,
+    dateFrom,
+    dateTo,
+    employeeId,
+    teamLeadId,
+  ])
 
   useEffect(() => {
-    void load({
-      dateFrom: defaultRange.dateFrom,
-      dateTo: defaultRange.dateTo,
-      employeeIdInput: '',
-      teamLeadIdInput: '',
-    })
-  }, [companyId, load, defaultRange.dateFrom, defaultRange.dateTo])
+    void load()
+  }, [load])
 
   return (
     <article className="page">
@@ -182,67 +247,43 @@ export function ReportsPage() {
         className="entity-zone__filters"
         onSubmit={(ev) => {
           ev.preventDefault()
-          void load({
-            dateFrom,
-            dateTo,
-            employeeIdInput,
-            teamLeadIdInput,
-          })
+          void load()
         }}
       >
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Период: с</span>
-          <input
-            className="entity-zone__input"
-            type="date"
-            value={dateFrom}
-            onChange={(ev) => setDateFrom(ev.target.value)}
-          />
+          <input className="entity-zone__input" type="date" value={dateFrom} onChange={(ev) => setDateFrom(ev.target.value)} />
         </label>
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Период: по</span>
-          <input
-            className="entity-zone__input"
-            type="date"
-            value={dateTo}
-            onChange={(ev) => setDateTo(ev.target.value)}
-          />
+          <input className="entity-zone__input" type="date" value={dateTo} onChange={(ev) => setDateTo(ev.target.value)} />
         </label>
         <label className="entity-zone__field">
-          <span className="entity-zone__field-label">Сотрудник (опционально)</span>
-          <input
-            className="entity-zone__input"
-            value={employeeIdInput}
-            onChange={(ev) => setEmployeeIdInput(ev.target.value)}
-            inputMode="numeric"
-            placeholder="Введите номер сотрудника"
-          />
+          <span className="entity-zone__field-label">Сотрудник</span>
+          <select className="entity-zone__select" value={employeeId} onChange={(ev) => setEmployeeId(ev.target.value)}>
+            <option value="">Все</option>
+            {sortedEmployees.map((employee) => (
+              <option key={employee.id} value={String(employee.id)}>
+                {employee.full_name}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="entity-zone__field">
-          <span className="entity-zone__field-label">Тимлид (опционально)</span>
-          <input
-            className="entity-zone__input"
-            value={teamLeadIdInput}
-            onChange={(ev) => setTeamLeadIdInput(ev.target.value)}
-            inputMode="numeric"
-            placeholder="Введите номер тимлида"
-          />
+          <span className="entity-zone__field-label">Тимлид</span>
+          <select className="entity-zone__select" value={teamLeadId} onChange={(ev) => setTeamLeadId(ev.target.value)}>
+            <option value="">Все</option>
+            {sortedEmployees.map((employee) => (
+              <option key={employee.id} value={String(employee.id)}>
+                {employee.full_name}
+              </option>
+            ))}
+          </select>
         </label>
       </form>
 
       <div className="entity-zone__actions">
-        <button
-          className="entity-zone__button entity-zone__button--primary"
-          type="button"
-          onClick={() =>
-            void load({
-              dateFrom,
-              dateTo,
-              employeeIdInput,
-              teamLeadIdInput,
-            })
-          }
-        >
+        <button className="entity-zone__button entity-zone__button--primary" type="button" onClick={() => void load()}>
           Обновить отчёты
         </button>
       </div>
@@ -417,8 +458,7 @@ export function ReportsPage() {
             <div className="entity-zone__grid">
               {history.items.map((item) => {
                 const d = typeof item.decision === 'string' ? item.decision.toUpperCase() : item.decision
-                const decisionLabel =
-                  DECISION_LABEL[/** @type {keyof typeof DECISION_LABEL} */ (d)] ?? item.decision
+                const decisionLabel = DECISION_LABEL[/** @type {keyof typeof DECISION_LABEL} */ (d)] ?? item.decision
                 return (
                   <article key={item.decision_id} className="entity-zone__card entity-zone__card--panel">
                     <div className="entity-zone__card-name">{item.employee_name}</div>

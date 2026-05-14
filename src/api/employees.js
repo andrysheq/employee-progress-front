@@ -1,4 +1,5 @@
-import { apiGet } from './client.js'
+import { apiGet, apiPost } from './client.js'
+import { buildRegistryQuery, normalizePage } from './registry.js'
 
 /**
  * @typedef {object} EmployeeView
@@ -42,6 +43,39 @@ export function fetchEmployeesByCompany(companyId) {
   return /** @type {Promise<EmployeeView[]>} */ (
     apiGet(`/employees/companies/${Math.trunc(companyId)}`)
   )
+}
+
+/**
+ * @typedef {object} EmployeesRegistryFilter
+ * @property {number | null | undefined} [company_id]
+ * @property {number | null | undefined} [department_id]
+ * @property {boolean | null | undefined} [is_active]
+ * @property {string | null | undefined} [hired_from]
+ * @property {string | null | undefined} [hired_to]
+ * @property {string | null | undefined} [full_name_like]
+ * @property {string | null | undefined} [email_like]
+ */
+
+/**
+ * @typedef {object} RegistryPageOpts
+ * @property {number | null | undefined} [page]
+ * @property {number | null | undefined} [size]
+ * @property {string | null | undefined} [sort]
+ */
+
+/**
+ * @param {EmployeesRegistryFilter} [filter]
+ * @param {RegistryPageOpts} [options]
+ * @returns {Promise<{ content: EmployeeView[], totalElements: number, totalPages: number, size: number, page: number }>}
+ */
+export async function fetchEmployeesRegistry(filter = {}, options = {}) {
+  const query = buildRegistryQuery({
+    page: options.page ?? 0,
+    size: options.size ?? 100,
+    sort: options.sort ?? 'createdAt,desc',
+  })
+  const payload = await apiPost(`/employees/registry${query}`, filter)
+  return normalizePage(payload)
 }
 
 /**

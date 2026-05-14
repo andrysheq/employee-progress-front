@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, employeesApi, promotionDecisionsApi } from '../api/index.js'
+import { useAuth } from '../auth/useAuth.js'
+import { hasDirectorRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import './pages.css'
 import './EntityZone.css'
@@ -8,21 +10,6 @@ import './EntityZone.css'
 const DECISION_LABEL = {
   APPROVED: 'Одобрено',
   REJECTED: 'Отклонено',
-}
-
-/**
- * @param {string} value
- * @returns {number | null}
- */
-function parsePositiveInt(value) {
-  if (!value || value.trim() === '') {
-    return null
-  }
-  const n = Number(value)
-  if (!Number.isFinite(n) || n <= 0) {
-    return null
-  }
-  return Math.trunc(n)
 }
 
 /**
@@ -42,12 +29,14 @@ function formatDateTime(iso) {
 
 export function PromotionDecisionsPage() {
   const { companyId } = resolveCompanyId()
+  const { roles } = useAuth()
+  const canRead = hasDirectorRole(roles)
+
   const [employees, setEmployees] = useState(
     /** @type {import('../api/employees.js').EmployeeView[] | null} */ (null),
   )
-  const [employeeFilterId, setEmployeeFilterId] = useState('')
-  const [reviewCycleIdInput, setReviewCycleIdInput] = useState('')
-  const [teamLeadIdInput, setTeamLeadIdInput] = useState('')
+  const [employeeNameLike, setEmployeeNameLike] = useState('')
+  const [teamLeadId, setTeamLeadId] = useState('')
   const [decision, setDecision] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -64,8 +53,11 @@ export function PromotionDecisionsPage() {
       return
     }
     try {
-      const list = await employeesApi.fetchEmployeesByCompany(companyId)
-      setEmployees(Array.isArray(list) ? list : [])
+      const page = await employeesApi.fetchEmployeesRegistry(
+        { company_id: companyId, is_active: true },
+        { size: 300, sort: 'fullName,asc' },
+      )
+      setEmployees(page.content)
     } catch {
       setEmployees(null)
     }
@@ -84,56 +76,49 @@ export function PromotionDecisionsPage() {
     )
   }, [employees])
 
-  const load = useCallback(
-    async (params) => {
-      const employeeId = params.employeeFilterId ? parsePositiveInt(params.employeeFilterId) : null
-      const reviewCycleId = parsePositiveInt(params.reviewCycleIdInput)
-      const teamLeadId = parsePositiveInt(params.teamLeadIdInput)
-      const filter = {
-        employee_id: employeeId,
-        review_cycle_id: reviewCycleId,
-        company_id: companyId,
-        team_lead_id: teamLeadId,
-        decision: params.decision || null,
-        date_from: params.dateFrom || null,
-        date_to: params.dateTo || null,
-      }
-      if (filter.company_id == null && filter.employee_id == null) {
-        setItems(null)
-        setError(null)
-        return
-      }
-      setLoading(true)
+  const load = useCallback(async () => {
+    if (companyId == null) {
+      setItems(null)
       setError(null)
-      try {
-        const list = await promotionDecisionsApi.fetchPromotionDecisions(filter)
-        setItems(Array.isArray(list) ? list : [])
-      } catch (e) {
-        setItems(null)
-        if (e instanceof ApiError) {
-          setError(e.message)
-        } else if (e instanceof Error) {
-          setError(e.message)
-        } else {
-          setError('Не удалось загрузить кадровые решения')
-        }
-      } finally {
-        setLoading(false)
+      return
+    }
+    if (!canRead) {
+      setItems(null)
+      setError('Недостаточно прав для просмотра кадровых решений')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+      const page = await promotionDecisionsApi.fetchPromotionDecisionsRegistry(
+        {
+          company_id: companyId,
+          team_lead_id: teamLeadId ? Number(teamLeadId) : null,
+          decision_type: decision || null,
+          date_from: dateFrom || null,
+          date_to: dateTo || null,
+          employee_title_like: employeeNameLike.trim() || null,
+        },
+        { size: 100, sort: 'decidedAt,desc' },
+      )
+      setItems(page.content)
+    } catch (e) {
+      setItems(null)
+      if (e instanceof ApiError) {
+        setError(e.message)
+      } else if (e instanceof Error) {
+        setError(e.message)
+      } else {
+        setError('Не удалось загрузить кадровые решения')
       }
-    },
-    [companyId],
-  )
+    } finally {
+      setLoading(false)
+    }
+  }, [canRead, companyId, dateFrom, dateTo, decision, employeeNameLike, teamLeadId])
 
   useEffect(() => {
-    void load({
-      employeeFilterId: '',
-      reviewCycleIdInput: '',
-      teamLeadIdInput: '',
-      decision: '',
-      dateFrom: '',
-      dateTo: '',
-    })
-  }, [companyId, load])
+    void load()
+  }, [load])
 
   return (
     <article className="page">
@@ -145,12 +130,11 @@ export function PromotionDecisionsPage() {
       </ol>
 
       <h1 className="page__title">Кадровые решения по повышению</h1>
-      <p className="page__lead">История решений по итогам ревью. Фильтры по компании, сотруднику, циклу и периоду.</p>
+      <p className="page__lead">История решений по итогам ревью с фильтрацией по значениям.</p>
 
       {companyId == null ? (
         <div className="entity-zone__error" role="status">
-          Не удалось определить компанию. Укажите сотрудника в фильтре или войдите с токеном, где есть{' '}
-          <code>company_id</code>.
+          Не удалось определить компанию.
         </div>
       ) : null}
 
@@ -158,24 +142,22 @@ export function PromotionDecisionsPage() {
         className="entity-zone__filters"
         onSubmit={(ev) => {
           ev.preventDefault()
-          void load({
-            employeeFilterId,
-            reviewCycleIdInput,
-            teamLeadIdInput,
-            decision,
-            dateFrom,
-            dateTo,
-          })
+          void load()
         }}
       >
+        <label className="entity-zone__field entity-zone__field--grow">
+          <span className="entity-zone__field-label">Сотрудник (поиск по ФИО)</span>
+          <input
+            className="entity-zone__input"
+            value={employeeNameLike}
+            onChange={(ev) => setEmployeeNameLike(ev.target.value)}
+            placeholder="Например: Сидоров"
+          />
+        </label>
         <label className="entity-zone__field">
-          <span className="entity-zone__field-label">Сотрудник</span>
-          <select
-            className="entity-zone__select"
-            value={employeeFilterId}
-            onChange={(ev) => setEmployeeFilterId(ev.target.value)}
-          >
-            <option value="">Все сотрудники компании</option>
+          <span className="entity-zone__field-label">Тимлид</span>
+          <select className="entity-zone__select" value={teamLeadId} onChange={(ev) => setTeamLeadId(ev.target.value)}>
+            <option value="">Все</option>
             {sortedEmployees.map((emp) => (
               <option key={emp.id} value={String(emp.id)}>
                 {emp.full_name}
@@ -184,32 +166,8 @@ export function PromotionDecisionsPage() {
           </select>
         </label>
         <label className="entity-zone__field">
-          <span className="entity-zone__field-label">Цикл ревью (ID)</span>
-          <input
-            className="entity-zone__input"
-            value={reviewCycleIdInput}
-            onChange={(ev) => setReviewCycleIdInput(ev.target.value)}
-            inputMode="numeric"
-            placeholder="Необязательно"
-          />
-        </label>
-        <label className="entity-zone__field">
-          <span className="entity-zone__field-label">Тимлид (ID)</span>
-          <input
-            className="entity-zone__input"
-            value={teamLeadIdInput}
-            onChange={(ev) => setTeamLeadIdInput(ev.target.value)}
-            inputMode="numeric"
-            placeholder="По связанному ИПР"
-          />
-        </label>
-        <label className="entity-zone__field">
           <span className="entity-zone__field-label">Решение</span>
-          <select
-            className="entity-zone__select"
-            value={decision}
-            onChange={(ev) => setDecision(ev.target.value)}
-          >
+          <select className="entity-zone__select" value={decision} onChange={(ev) => setDecision(ev.target.value)}>
             <option value="">Все</option>
             <option value="APPROVED">Одобрено</option>
             <option value="REJECTED">Отклонено</option>
@@ -217,39 +175,16 @@ export function PromotionDecisionsPage() {
         </label>
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Период: с</span>
-          <input
-            className="entity-zone__input"
-            type="date"
-            value={dateFrom}
-            onChange={(ev) => setDateFrom(ev.target.value)}
-          />
+          <input className="entity-zone__input" type="date" value={dateFrom} onChange={(ev) => setDateFrom(ev.target.value)} />
         </label>
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Период: по</span>
-          <input
-            className="entity-zone__input"
-            type="date"
-            value={dateTo}
-            onChange={(ev) => setDateTo(ev.target.value)}
-          />
+          <input className="entity-zone__input" type="date" value={dateTo} onChange={(ev) => setDateTo(ev.target.value)} />
         </label>
       </form>
 
       <div className="entity-zone__actions">
-        <button
-          className="entity-zone__button entity-zone__button--primary"
-          type="button"
-          onClick={() =>
-            void load({
-              employeeFilterId,
-              reviewCycleIdInput,
-              teamLeadIdInput,
-              decision,
-              dateFrom,
-              dateTo,
-            })
-          }
-        >
+        <button className="entity-zone__button entity-zone__button--primary" type="button" onClick={() => void load()}>
           Применить фильтры
         </button>
       </div>
@@ -273,11 +208,8 @@ export function PromotionDecisionsPage() {
               <div className="entity-zone__card-name">
                 {DECISION_LABEL[/** @type {keyof typeof DECISION_LABEL} */ (item.decision)] ?? item.decision}
               </div>
-              <div className="entity-zone__card-code">
-                Цикл ревью #{item.review_cycle_id} · сотрудник #{item.employee_id}
-              </div>
+              <div className="entity-zone__card-code">{item.employee_name}</div>
               <div className="entity-zone__card-meta">
-                <span className="entity-zone__badge">{item.employee_name}</span>
                 <span className="entity-zone__badge">
                   {item.from_grade_code} → {item.to_grade_code ?? '—'}
                 </span>

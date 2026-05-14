@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiError, reviewCyclesApi } from '../api/index.js'
+import { ApiError, employeesApi, reviewCyclesApi } from '../api/index.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import './pages.css'
 import './EntityZone.css'
@@ -14,21 +14,6 @@ const STATUS_LABEL = {
   SCHEDULED: 'Запланирован',
   COMPLETED: 'Завершён',
   CANCELLED: 'Отменён',
-}
-
-/**
- * @param {string} value
- * @returns {number | null}
- */
-function parsePositiveInt(value) {
-  if (!value || value.trim() === '') {
-    return null
-  }
-  const n = Number(value)
-  if (!Number.isFinite(n) || n <= 0) {
-    return null
-  }
-  return Math.trunc(n)
 }
 
 /**
@@ -46,10 +31,26 @@ function formatDateTime(iso) {
   return d.toLocaleString('ru-RU')
 }
 
+/**
+ * @param {import('../api/employees.js').EmployeeView[] | null} employees
+ */
+function buildEmployeeNameMap(employees) {
+  const map = new Map()
+  if (!Array.isArray(employees)) {
+    return map
+  }
+  for (const employee of employees) {
+    if (employee && typeof employee.id === 'number' && typeof employee.full_name === 'string') {
+      map.set(employee.id, employee.full_name)
+    }
+  }
+  return map
+}
+
 export function ReviewsPage() {
   const { companyId } = resolveCompanyId()
 
-  const [employeeIdInput, setEmployeeIdInput] = useState('')
+  const [employeeNameLike, setEmployeeNameLike] = useState('')
   const [reviewType, setReviewType] = useState('')
   const [status, setStatus] = useState('')
   const [dateFrom, setDateFrom] = useState('')
@@ -60,18 +61,34 @@ export function ReviewsPage() {
   const [items, setItems] = useState(
     /** @type {import('../api/reviewCycles.js').ReviewCycleView[] | null} */ (null),
   )
+  const [employees, setEmployees] = useState(
+    /** @type {import('../api/employees.js').EmployeeView[] | null} */ (null),
+  )
 
-  const load = useCallback(async (params) => {
-    const employeeId = parsePositiveInt(params.employeeIdInput)
-    const filter = {
-      employee_id: employeeId,
-      company_id: companyId,
-      review_type: params.reviewType || null,
-      status: params.status || null,
-      date_from: params.dateFrom || null,
-      date_to: params.dateTo || null,
+  const loadEmployees = useCallback(async () => {
+    if (companyId == null) {
+      setEmployees(null)
+      return
     }
-    if (filter.company_id == null && filter.employee_id == null) {
+    try {
+      const page = await employeesApi.fetchEmployeesRegistry(
+        { company_id: companyId, is_active: true },
+        { size: 300, sort: 'fullName,asc' },
+      )
+      setEmployees(page.content)
+    } catch {
+      setEmployees(null)
+    }
+  }, [companyId])
+
+  useEffect(() => {
+    void loadEmployees()
+  }, [loadEmployees])
+
+  const employeeNameMap = useMemo(() => buildEmployeeNameMap(employees), [employees])
+
+  const load = useCallback(async () => {
+    if (companyId == null) {
       setItems(null)
       setError(null)
       return
@@ -79,8 +96,18 @@ export function ReviewsPage() {
     setLoading(true)
     setError(null)
     try {
-      const list = await reviewCyclesApi.fetchReviewCycles(filter)
-      setItems(Array.isArray(list) ? list : [])
+      const page = await reviewCyclesApi.fetchReviewCyclesRegistry(
+        {
+          company_id: companyId,
+          review_type: reviewType || null,
+          status: status || null,
+          date_from: dateFrom || null,
+          date_to: dateTo || null,
+          employee_title_like: employeeNameLike.trim() || null,
+        },
+        { size: 100, sort: 'scheduledAt,desc' },
+      )
+      setItems(page.content)
     } catch (e) {
       setItems(null)
       if (e instanceof ApiError) {
@@ -93,17 +120,11 @@ export function ReviewsPage() {
     } finally {
       setLoading(false)
     }
-  }, [companyId])
+  }, [companyId, dateFrom, dateTo, employeeNameLike, reviewType, status])
 
   useEffect(() => {
-    void load({
-      employeeIdInput: '',
-      reviewType: '',
-      status: '',
-      dateFrom: '',
-      dateTo: '',
-    })
-  }, [companyId, load])
+    void load()
+  }, [load])
 
   return (
     <article className="page">
@@ -119,7 +140,7 @@ export function ReviewsPage() {
 
       {companyId == null ? (
         <div className="entity-zone__error" role="status">
-          Не удалось определить компанию. Чтобы увидеть ревью, выберите сотрудника в фильтре.
+          Не удалось определить компанию.
         </div>
       ) : null}
 
@@ -127,32 +148,21 @@ export function ReviewsPage() {
         className="entity-zone__filters"
         onSubmit={(ev) => {
           ev.preventDefault()
-          void load({
-            employeeIdInput,
-            reviewType,
-            status,
-            dateFrom,
-            dateTo,
-          })
+          void load()
         }}
       >
-        <label className="entity-zone__field">
-          <span className="entity-zone__field-label">Сотрудник</span>
+        <label className="entity-zone__field entity-zone__field--grow">
+          <span className="entity-zone__field-label">Сотрудник (поиск по ФИО)</span>
           <input
             className="entity-zone__input"
-            value={employeeIdInput}
-            onChange={(ev) => setEmployeeIdInput(ev.target.value)}
-            inputMode="numeric"
-            placeholder="Введите номер сотрудника"
+            value={employeeNameLike}
+            onChange={(ev) => setEmployeeNameLike(ev.target.value)}
+            placeholder="Например: Петров"
           />
         </label>
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Тип ревью</span>
-          <select
-            className="entity-zone__select"
-            value={reviewType}
-            onChange={(ev) => setReviewType(ev.target.value)}
-          >
+          <select className="entity-zone__select" value={reviewType} onChange={(ev) => setReviewType(ev.target.value)}>
             <option value="">Все</option>
             <option value="INTERIM_PROGRESS">Промежуточное</option>
             <option value="FINAL_PROMOTION">Итоговое</option>
@@ -160,11 +170,7 @@ export function ReviewsPage() {
         </label>
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Статус</span>
-          <select
-            className="entity-zone__select"
-            value={status}
-            onChange={(ev) => setStatus(ev.target.value)}
-          >
+          <select className="entity-zone__select" value={status} onChange={(ev) => setStatus(ev.target.value)}>
             <option value="">Все</option>
             <option value="SCHEDULED">Запланирован</option>
             <option value="COMPLETED">Завершён</option>
@@ -173,38 +179,16 @@ export function ReviewsPage() {
         </label>
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Период: с</span>
-          <input
-            className="entity-zone__input"
-            type="date"
-            value={dateFrom}
-            onChange={(ev) => setDateFrom(ev.target.value)}
-          />
+          <input className="entity-zone__input" type="date" value={dateFrom} onChange={(ev) => setDateFrom(ev.target.value)} />
         </label>
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Период: по</span>
-          <input
-            className="entity-zone__input"
-            type="date"
-            value={dateTo}
-            onChange={(ev) => setDateTo(ev.target.value)}
-          />
+          <input className="entity-zone__input" type="date" value={dateTo} onChange={(ev) => setDateTo(ev.target.value)} />
         </label>
       </form>
 
       <div className="entity-zone__actions">
-        <button
-          className="entity-zone__button entity-zone__button--primary"
-          type="button"
-          onClick={() =>
-            void load({
-              employeeIdInput,
-              reviewType,
-              status,
-              dateFrom,
-              dateTo,
-            })
-          }
-        >
+        <button className="entity-zone__button entity-zone__button--primary" type="button" onClick={() => void load()}>
           Применить фильтры
         </button>
       </div>
@@ -226,6 +210,9 @@ export function ReviewsPage() {
           {items.map((item) => (
             <article key={item.review_cycle_id} className="entity-zone__card">
               <div className="entity-zone__card-name">{REVIEW_TYPE_LABEL[item.review_type] ?? item.review_type}</div>
+              <div className="entity-zone__card-code">
+                {employeeNameMap.get(item.employee_id) ?? 'Сотрудник'}
+              </div>
               <div className="entity-zone__card-meta">
                 <span className="entity-zone__badge">{STATUS_LABEL[item.status] ?? item.status}</span>
                 <span className="entity-zone__badge">Планов учтено: {item.considered_development_plan_ids.length}</span>
