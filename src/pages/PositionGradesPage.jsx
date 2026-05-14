@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, gradeModelApi } from '../api/index.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { ConfirmDialog } from '../components/ConfirmDialog.jsx'
 import './pages.css'
 import './EntityZone.css'
 
@@ -73,6 +74,7 @@ export function PositionGradesPage() {
   const [gradeForm, setGradeForm] = useState(
     /** @type {{ mode: 'create' | 'edit', gradeId?: number, positionId: number, code: string, name: string, description: string, levelOrder: string, salaryMinAmount: string, salaryMaxAmount: string, isActive: boolean } | null} */ (null),
   )
+  const [gradeToDeactivate, setGradeToDeactivate] = useState(/** @type {number | null} */ (null))
 
   const load = useCallback(async () => {
     if (companyId == null || positionId == null) {
@@ -111,7 +113,8 @@ export function PositionGradesPage() {
     const onKeyDown = (ev) => {
       if (ev.key === 'Escape' && !submitting) {
         setGradeForm(null)
-        setActionError(null)
+    setGradeToDeactivate(null)
+    setActionError(null)
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -231,6 +234,7 @@ export function PositionGradesPage() {
       }
 
       setGradeForm(null)
+      setGradeToDeactivate(null)
       await load()
     } catch (e) {
       if (e instanceof ApiError) {
@@ -247,14 +251,12 @@ export function PositionGradesPage() {
 
   /** @param {number} gradeId */
   async function handleDeactivateGrade(gradeId) {
-    if (!window.confirm('Деактивировать грейд?')) {
-      return
-    }
     setSubmitting(true)
     setActionError(null)
     try {
       await gradeModelApi.deactivateGrade(gradeId)
       setGradeForm(null)
+      setGradeToDeactivate(null)
       await load()
     } catch (e) {
       if (e instanceof ApiError) {
@@ -274,6 +276,7 @@ export function PositionGradesPage() {
       return
     }
     setGradeForm(null)
+    setGradeToDeactivate(null)
     setActionError(null)
   }
 
@@ -386,17 +389,17 @@ export function PositionGradesPage() {
                           disabled={submitting}
                         >
                           ✎
-                        </button>
+              </button>
                         <button
                           type="button"
                           className="entity-zone__icon-button entity-zone__icon-button--danger"
                           title="Деактивировать грейд"
                           aria-label="Деактивировать грейд"
-                          onClick={() => void handleDeactivateGrade(g.id)}
+                          onClick={() => setGradeToDeactivate(g.id)}
                           disabled={submitting || !g.is_active}
                         >
                           −
-                        </button>
+              </button>
                       </span>
                     ) : null}
                   </div>
@@ -510,6 +513,22 @@ export function PositionGradesPage() {
           </section>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={gradeToDeactivate != null}
+        title="Подтвердите действие"
+        message="Деактивировать грейд?"
+        confirmLabel="Деактивировать"
+        cancelLabel="Отменить"
+        destructive
+        busy={submitting}
+        onCancel={() => (!submitting ? setGradeToDeactivate(null) : undefined)}
+        onConfirm={() => {
+          if (gradeToDeactivate != null) {
+            void handleDeactivateGrade(gradeToDeactivate)
+          }
+        }}
+      />
     </article>
   )
 }

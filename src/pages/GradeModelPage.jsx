@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, gradeModelApi } from '../api/index.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { ConfirmDialog } from '../components/ConfirmDialog.jsx'
 import './pages.css'
 import './EntityZone.css'
 
@@ -29,6 +30,7 @@ export function GradeModelPage() {
   const [positionForm, setPositionForm] = useState(
     /** @type {{ mode: 'create' | 'edit', positionId?: number, code: string, name: string, description: string, isActive: boolean } | null} */ (null),
   )
+  const [positionToDeactivate, setPositionToDeactivate] = useState(/** @type {number | null} */ (null))
 
   const load = useCallback(async () => {
     if (companyId == null) {
@@ -66,7 +68,8 @@ export function GradeModelPage() {
     const onKeyDown = (ev) => {
       if (ev.key === 'Escape' && !submitting) {
         setPositionForm(null)
-        setActionError(null)
+    setPositionToDeactivate(null)
+    setActionError(null)
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -114,6 +117,7 @@ export function GradeModelPage() {
         await gradeModelApi.updatePosition(positionForm.positionId, payload)
       }
       setPositionForm(null)
+      setPositionToDeactivate(null)
       await load()
     } catch (e) {
       if (e instanceof ApiError) {
@@ -130,14 +134,12 @@ export function GradeModelPage() {
 
   /** @param {number} positionId */
   async function handleDeactivatePosition(positionId) {
-    if (!window.confirm('Деактивировать должность?')) {
-      return
-    }
     setSubmitting(true)
     setActionError(null)
     try {
       await gradeModelApi.deactivatePosition(positionId)
       setPositionForm(null)
+      setPositionToDeactivate(null)
       await load()
     } catch (e) {
       if (e instanceof ApiError) {
@@ -157,6 +159,7 @@ export function GradeModelPage() {
       return
     }
     setPositionForm(null)
+    setPositionToDeactivate(null)
     setActionError(null)
   }
 
@@ -270,17 +273,17 @@ export function GradeModelPage() {
                         disabled={submitting}
                       >
                         ✎
-                      </button>
+              </button>
                       <button
                         type="button"
                         className="entity-zone__icon-button entity-zone__icon-button--danger"
                         title="Деактивировать должность"
                         aria-label="Деактивировать должность"
-                        onClick={() => void handleDeactivatePosition(p.id)}
+                        onClick={() => setPositionToDeactivate(p.id)}
                         disabled={submitting || !p.is_active}
                       >
                         −
-                      </button>
+              </button>
                     </span>
                   ) : null}
                 </div>
@@ -363,6 +366,22 @@ export function GradeModelPage() {
           </section>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={positionToDeactivate != null}
+        title="Подтвердите действие"
+        message="Деактивировать должность?"
+        confirmLabel="Деактивировать"
+        cancelLabel="Отменить"
+        destructive
+        busy={submitting}
+        onCancel={() => (!submitting ? setPositionToDeactivate(null) : undefined)}
+        onConfirm={() => {
+          if (positionToDeactivate != null) {
+            void handleDeactivatePosition(positionToDeactivate)
+          }
+        }}
+      />
     </article>
   )
 }
