@@ -6,35 +6,27 @@ import './pages.css'
 import './EntityZone.css'
 
 export function DepartmentsPage() {
-  const { companyId, source } = resolveCompanyId()
-
+  const { companyId } = resolveCompanyId()
   const [onlyActive, setOnlyActive] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(/** @type {string | null} */ (null))
-  const [requestId, setRequestId] = useState(/** @type {string | null} */ (null))
   const [items, setItems] = useState(null)
 
   const load = useCallback(async () => {
     if (companyId == null) {
       setItems(null)
       setError(null)
-      setRequestId(null)
       return
     }
     setLoading(true)
     setError(null)
-    setRequestId(null)
     try {
-      const list = await departmentsApi.fetchDepartmentsByCompany(
-        companyId,
-        onlyActive,
-      )
+      const list = await departmentsApi.fetchDepartmentsByCompany(companyId, onlyActive)
       setItems(Array.isArray(list) ? list : [])
     } catch (e) {
       setItems(null)
       if (e instanceof ApiError) {
         setError(e.message)
-        setRequestId(e.requestId)
       } else if (e instanceof Error) {
         setError(e.message)
       } else {
@@ -49,13 +41,6 @@ export function DepartmentsPage() {
     void load()
   }, [load])
 
-  const companyHint =
-    source === 'jwt'
-      ? 'Компания из JWT'
-      : source === 'env'
-        ? 'Компания из VITE_DEV_COMPANY_ID'
-        : null
-
   return (
     <article className="page">
       <ol className="page__breadcrumbs">
@@ -66,23 +51,13 @@ export function DepartmentsPage() {
       </ol>
 
       <h1 className="page__title">Отделы</h1>
-      <p className="page__lead">
-        Список отделов компании. Создание и назначение директора доступны по API роли «Генеральный директор»;
-        чтение списка — всем выданным ролям с грантом{' '}
-        <code>READ_COMPANY_DEPARTMENTS</code>.
-      </p>
+      <p className="page__lead">Здесь отображаются отделы вашей компании.</p>
 
       {companyId == null ? (
         <div className="entity-zone__error" role="status">
-          <strong>Не задана компания.</strong> Войдите и положите access token в{' '}
-          <code>sessionStorage</code> (ключ <code>ep_access_token</code>), чтобы в JWT был claim{' '}
-          <code>company_id</code> (имя настраивается в <code>VITE_JWT_COMPANY_CLAIM</code>), либо для чисто
-          локальной вёрстки задайте в <code>.env</code> строку <code>VITE_DEV_COMPANY_ID=&#123;id из БД&#125;</code>{' '}
-          и перезапустите <code>npm run dev</code>. Пример — в <code>.env.example</code>.
+          Не удалось определить компанию для загрузки отделов. Обновите страницу или войдите заново.
         </div>
-      ) : null}
-
-      {companyId != null ? (
+      ) : (
         <div className="entity-zone__toolbar">
           <label className="entity-zone__toggle">
             <input
@@ -92,35 +67,16 @@ export function DepartmentsPage() {
             />
             Только активные отделы
           </label>
-          <span className="entity-zone__hint">
-            {companyHint ? (
-              <>
-                {companyHint}: <strong>{companyId}</strong>
-              </>
-            ) : (
-              <>
-                Компания: <strong>{companyId}</strong>
-              </>
-            )}
-          </span>
         </div>
-      ) : null}
+      )}
 
       {error ? (
         <div className="entity-zone__error" role="alert">
           {error}
-          {requestId ? (
-            <>
-              {' '}
-              <code>(request_id: {requestId})</code>
-            </>
-          ) : null}
         </div>
       ) : null}
 
-      {loading ? (
-        <p className="entity-zone__loading">Загрузка…</p>
-      ) : null}
+      {loading ? <p className="entity-zone__loading">Загрузка…</p> : null}
 
       {!loading && companyId != null && items && items.length === 0 ? (
         <p className="entity-zone__empty">Отделы не найдены.</p>
@@ -132,9 +88,7 @@ export function DepartmentsPage() {
             <article key={d.id} className="entity-zone__card">
               <div className="entity-zone__card-name">{d.name}</div>
               <div className="entity-zone__card-code">{d.code}</div>
-              {d.description ? (
-                <p className="entity-zone__card-desc">{d.description}</p>
-              ) : null}
+              {d.description ? <p className="entity-zone__card-desc">{d.description}</p> : null}
               <div className="entity-zone__card-meta">
                 <span
                   className={
@@ -145,13 +99,9 @@ export function DepartmentsPage() {
                 >
                   {d.is_active ? 'Активен' : 'Неактивен'}
                 </span>
-                {d.director_employee_id != null ? (
-                  <span className="entity-zone__badge">
-                    Директор: #{d.director_employee_id}
-                  </span>
-                ) : (
-                  <span className="entity-zone__badge">Директор не назначен</span>
-                )}
+                <span className="entity-zone__badge">
+                  {d.director_employee_id != null ? 'Директор назначен' : 'Директор не назначен'}
+                </span>
               </div>
             </article>
           ))}

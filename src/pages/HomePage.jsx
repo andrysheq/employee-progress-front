@@ -3,36 +3,27 @@ import { useAuth } from '../auth/useAuth.js'
 import './pages.css'
 
 export function HomePage() {
-  const { isAuthenticated, roles } = useAuth()
+  const { isAuthenticated } = useAuth()
 
   return (
     <article className="page">
       <h1 className="page__title">Рабочий стол</h1>
       <p className="page__lead">
-        Скелет клиента для системы карьерного развития. Выберите раздел в меню или перейдите по ссылкам ниже.
+        Добро пожаловать в систему карьерного развития. Выберите нужный раздел в верхнем меню.
       </p>
 
       {!isAuthenticated ? (
         <p className="page__stub">
-          Вы не авторизованы.{' '}
-          <Link to="/login">Войти</Link> — токен попадёт в <code>sessionStorage</code>, после чего откроются зоны по
-          ролям из JWT (см. <code>docs/ui-roles.md</code>).
+          Чтобы продолжить работу, выполните вход в систему.
         </p>
-      ) : (
-        <p className="page__stub">
-          Сессия активна. Роли в токене:{' '}
-          <strong>{roles.length > 0 ? roles.join(', ') : 'не найдены — показаны все пункты меню'}</strong>. Скрытие
-          разделов — по эвристике из <code>src/auth/roleNav.js</code>; окончательный доступ всё равно определяет
-          ответ API (403 при недостаточных грантах).
-        </p>
-      )}
+      ) : null}
 
       <ul className="home-links">
         <li>
           <Link to="/development-plans">Индивидуальные планы развития</Link>
         </li>
         <li>
-          <Link to="/departments">Отделы компании</Link>
+          <Link to="/departments">Отделы</Link>
         </li>
         <li>
           <Link to="/grade-model">Матрица грейдов</Link>

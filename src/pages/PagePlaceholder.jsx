@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 import './pages.css'
 
 /**
- * Заглушка раздела до подключения API.
  * @param {{ title: string, description?: string, breadcrumbs?: { label: string, to?: string }[] }} props
  */
 export function PagePlaceholder({ title, description, breadcrumbs }) {
@@ -22,7 +21,7 @@ export function PagePlaceholder({ title, description, breadcrumbs }) {
       {description ? <p className="page__lead">{description}</p> : null}
 
       <div className="page__stub">
-        <p>Раздел в разработке: здесь будут списки, формы и вызовы API.</p>
+        <p>Раздел в разработке: здесь скоро появятся рабочие инструменты.</p>
       </div>
     </article>
   )

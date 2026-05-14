@@ -16,11 +16,10 @@ function displayDecimal(v) {
 }
 
 export function PoliciesPage() {
-  const { companyId, source } = resolveCompanyId()
+  const { companyId } = resolveCompanyId()
   const [onlyActive, setOnlyActive] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(/** @type {string | null} */ (null))
-  const [requestId, setRequestId] = useState(/** @type {string | null} */ (null))
   const [policies, setPolicies] = useState(
     /** @type {import('../api/promotionPolicies.js').PromotionPolicyView[] | null} */ (null),
   )
@@ -30,32 +29,26 @@ export function PoliciesPage() {
     if (companyId == null) {
       setPolicies(null)
       setError(null)
-      setRequestId(null)
       setActiveNote(null)
       return
     }
     setLoading(true)
     setError(null)
-    setRequestId(null)
     setActiveNote(null)
     try {
-      const list = await promotionPoliciesApi.fetchPoliciesByCompany(
-        companyId,
-        onlyActive,
-      )
+      const list = await promotionPoliciesApi.fetchPoliciesByCompany(companyId, onlyActive)
       setPolicies(Array.isArray(list) ? list : [])
       try {
         await promotionPoliciesApi.fetchActivePolicy(companyId)
       } catch (e) {
         if (e instanceof ApiError && e.httpStatus === 404) {
-          setActiveNote('Отдельный запрос активной политики вернул 404 (возможно, ни одна версия не помечена активной).')
+          setActiveNote('Сейчас активная версия политики не отмечена.')
         }
       }
     } catch (e) {
       setPolicies(null)
       if (e instanceof ApiError) {
         setError(e.message)
-        setRequestId(e.requestId)
       } else if (e instanceof Error) {
         setError(e.message)
       } else {
@@ -70,13 +63,6 @@ export function PoliciesPage() {
     void load()
   }, [load])
 
-  const companyHint =
-    source === 'jwt'
-      ? 'Компания из JWT'
-      : source === 'env'
-        ? 'Компания из VITE_DEV_COMPANY_ID'
-        : null
-
   return (
     <article className="page">
       <ol className="page__breadcrumbs">
@@ -87,19 +73,13 @@ export function PoliciesPage() {
       </ol>
 
       <h1 className="page__title">Политики повышения</h1>
-      <p className="page__lead">
-        Интервалы между ревью, минимум выполнения ИПР, веса оценок тимлида и менеджера. Список —{' '}
-        <code>GET /promotion-policies/companies/&#123;id&#125;</code> с параметром <code>onlyActive</code> (camelCase,
-        как в Spring).
-      </p>
+      <p className="page__lead">Правила, по которым оценивается готовность к повышению.</p>
 
       {companyId == null ? (
         <div className="entity-zone__error" role="status">
-          <strong>Не задана компания.</strong> Нужен JWT с <code>company_id</code> или <code>VITE_DEV_COMPANY_ID</code>.
+          Не удалось определить компанию для загрузки политик. Обновите страницу или войдите заново.
         </div>
-      ) : null}
-
-      {companyId != null ? (
+      ) : (
         <div className="entity-zone__toolbar">
           <label className="entity-zone__toggle">
             <input
@@ -109,19 +89,8 @@ export function PoliciesPage() {
             />
             Только активные политики
           </label>
-          <span className="entity-zone__hint">
-            {companyHint ? (
-              <>
-                {companyHint}: <strong>{companyId}</strong>
-              </>
-            ) : (
-              <>
-                Компания: <strong>{companyId}</strong>
-              </>
-            )}
-          </span>
         </div>
-      ) : null}
+      )}
 
       {activeNote ? (
         <p className="entity-zone__muted" role="status">
@@ -132,18 +101,10 @@ export function PoliciesPage() {
       {error ? (
         <div className="entity-zone__error" role="alert">
           {error}
-          {requestId ? (
-            <>
-              {' '}
-              <code>(request_id: {requestId})</code>
-            </>
-          ) : null}
         </div>
       ) : null}
 
-      {loading ? (
-        <p className="entity-zone__loading">Загрузка…</p>
-      ) : null}
+      {loading ? <p className="entity-zone__loading">Загрузка…</p> : null}
 
       {!loading && companyId != null && policies && policies.length === 0 && !error ? (
         <p className="entity-zone__empty">Политики не найдены.</p>
@@ -154,7 +115,6 @@ export function PoliciesPage() {
           {policies.map((pol) => (
             <article key={pol.id} className="entity-zone__card">
               <div className="entity-zone__card-name">{pol.name}</div>
-              <div className="entity-zone__card-code">id #{pol.id}</div>
               <div className="entity-zone__card-meta">
                 <span
                   className={
@@ -171,9 +131,9 @@ export function PoliciesPage() {
                 </span>
               </div>
               <p className="entity-zone__card-desc">
-                Между ревью: {pol.min_months_between_reviews} мес. · Мин. выполнение ИПР:{' '}
-                {displayDecimal(pol.min_completion_percent)}% · Веса: TL {displayDecimal(pol.weight_team_lead)} / M{' '}
-                {displayDecimal(pol.weight_manager)}
+                Интервал между ревью: {pol.min_months_between_reviews} мес. · Минимум выполнения ИПР:{' '}
+                {displayDecimal(pol.min_completion_percent)}% · Веса: тимлид {displayDecimal(pol.weight_team_lead)} /
+                менеджер {displayDecimal(pol.weight_manager)}
               </p>
             </article>
           ))}

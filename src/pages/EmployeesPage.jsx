@@ -1,21 +1,11 @@
 import { Link } from 'react-router-dom'
-import {
-  getEffectiveEmployeeId,
-  resolveCompanyId,
-} from '../config/companyContext.js'
+import { getEffectiveEmployeeId, resolveCompanyId } from '../config/companyContext.js'
 import './pages.css'
 import './EntityZone.css'
 
 export function EmployeesPage() {
-  const { companyId, source } = resolveCompanyId()
+  const { companyId } = resolveCompanyId()
   const employeeId = getEffectiveEmployeeId()
-
-  const companyHint =
-    source === 'jwt'
-      ? 'JWT'
-      : source === 'env'
-        ? 'VITE_DEV_COMPANY_ID'
-        : 'не задана'
 
   return (
     <article className="page">
@@ -27,34 +17,19 @@ export function EmployeesPage() {
       </ol>
 
       <h1 className="page__title">Сотрудники</h1>
-      <p className="page__lead">
-        Учёт сотрудников, отдел, грейд. В текущем API employee-progress нет отдельного GET «все сотрудники компании» для
-        произвольной таблицы: создание — <code>POST /companies/&#123;company_id&#125;/employees</code>, смена отдела —{' '}
-        <code>PATCH .../department</code>. Списки по ролям строятся на стороне backend (см. OpenAPI и{' '}
-        <code>docs/ui-roles.md</code>).
-      </p>
+      <p className="page__lead">Раздел для работы с профилями сотрудников и их карьерным треком.</p>
 
       <div className="entity-zone__toolbar">
         <span className="entity-zone__hint">
-          Компания:{' '}
-          {companyId != null ? (
-            <>
-              <strong>{companyId}</strong> ({companyHint})
-            </>
-          ) : (
-            <span>не задана — задайте JWT или VITE_DEV_COMPANY_ID</span>
-          )}
+          {companyId != null ? 'Контекст компании определён' : 'Контекст компании не определён'}
         </span>
         <span className="entity-zone__hint">
-          Текущий сотрудник (JWT):{' '}
-          {employeeId != null ? <strong>#{employeeId}</strong> : 'нет claim employee_id'}
+          {employeeId != null ? 'Пользователь определён' : 'Пользователь не определён'}
         </span>
       </div>
 
       <p className="entity-zone__muted">
-        Следующий шаг для этой зоны — либо договорённость с backend о read-эндпоинте списка под ваши роли, либо
-        интеграция с существующим BFF/поиском. Пока используйте страницы «Отделы», «Матрица грейдов» и ИПР для
-        проверки контекста <code>company_id</code> / <code>employee_id</code> из токена.
+        Здесь скоро появятся список сотрудников, карточка профиля и кадровые действия.
       </p>
     </article>
   )

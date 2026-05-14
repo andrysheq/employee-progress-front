@@ -4,23 +4,14 @@ import './AppShell.css'
 
 export function AppHeader() {
   const navigate = useNavigate()
-  const {
-    isAuthenticated,
-    visibleNavItems,
-    roles,
-    subject,
-    companyIdFromJwt,
-    employeeIdFromJwt,
-    clearSession,
-  } = useAuth()
+  const { isAuthenticated, visibleNavItems, displayName, clearSession } = useAuth()
 
   function onLogout() {
     clearSession()
     navigate('/login', { replace: true })
   }
 
-  const rolesShort =
-    roles.length > 0 ? roles.join(', ') : isAuthenticated ? 'роли не указаны в токене' : ''
+  const userName = displayName ?? 'Пользователь'
 
   return (
     <header className="app-header">
@@ -36,9 +27,7 @@ export function AppHeader() {
               key={to}
               to={to}
               end={end}
-              className={({ isActive }) =>
-                `app-nav__link${isActive ? ' app-nav__link--active' : ''}`
-              }
+              className={({ isActive }) => `app-nav__link${isActive ? ' app-nav__link--active' : ''}`}
             >
               {label}
             </NavLink>
@@ -48,21 +37,17 @@ export function AppHeader() {
         <div className="app-header__tools">
           {isAuthenticated ? (
             <>
-              <span className="app-header__session" title={rolesShort}>
-                {subject ? `УЗ #${subject}` : 'Вошли'}
-                {companyIdFromJwt != null ? ` · компания ${companyIdFromJwt}` : ''}
-                {employeeIdFromJwt != null ? ` · сотр. ${employeeIdFromJwt}` : ''}
+              <span className="app-header__session" title={userName}>
+                {userName}
               </span>
               <button type="button" className="app-header__btn" onClick={onLogout}>
                 Выйти
               </button>
             </>
           ) : (
-            <>
-              <NavLink to="/login" className="app-header__btn app-header__btn--link">
-                Войти
-              </NavLink>
-            </>
+            <NavLink to="/login" className="app-header__btn app-header__btn--link">
+              Войти
+            </NavLink>
           )}
         </div>
       </div>

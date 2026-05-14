@@ -36,9 +36,7 @@ export function LoginPage() {
       <div className="login-card">
         <h1 className="login-card__title">Вход</h1>
         <p className="login-card__lead">
-          Авторизация через <strong>users-service</strong> (<code>POST /users/auth/login</code>). После входа токен
-          сохраняется в <code>sessionStorage</code> под ключом <code>ep_access_token</code> — запросы к{' '}
-          <code>/employee-progress</code> пойдут с Bearer.
+          Введите email и пароль от вашей учётной записи.
         </p>
 
         <form onSubmit={onSubmit}>
@@ -79,9 +77,7 @@ export function LoginPage() {
         </form>
 
         <p className="login-card__footer">
-          Нет учётной записи — зарегистрируйтесь через{' '}
-          <code>POST /users/auth/register</code> (по умолчанию выдаётся роль «Сотрудник») или создайте пользователя из
-          employee-progress по вашему процессу.
+          Если у вас нет доступа, обратитесь к администратору системы.
         </p>
       </div>
 
