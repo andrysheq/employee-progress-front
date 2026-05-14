@@ -40,7 +40,10 @@ export function AuthProvider({ children }) {
       }
     }
     const payload = parseJwtPayload(token)
-    const roles = normalizeJwtRoles(payload?.roles)
+    const roles = normalizeJwtRoles([
+      ...(Array.isArray(payload?.roles) ? payload.roles : payload?.roles != null ? [payload.roles] : []),
+      ...(Array.isArray(payload?.role_ids) ? payload.role_ids : payload?.role_ids != null ? [payload.role_ids] : []),
+    ])
     const subject = payload?.sub != null ? String(payload.sub) : null
     return {
       isAuthenticated: true,
