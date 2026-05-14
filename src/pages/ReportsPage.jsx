@@ -1,9 +1,20 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, reportsApi } from '../api/index.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import './pages.css'
 import './EntityZone.css'
+
+const PLAN_STATUS_LABEL = {
+  DRAFT: 'Черновик',
+  ACTIVE: 'Активен',
+  ARCHIVED: 'Архив',
+}
+
+const DECISION_LABEL = {
+  APPROVED: 'Одобрено',
+  REJECTED: 'Отклонено',
+}
 
 /**
  * @returns {{ dateFrom: string, dateTo: string }}
@@ -46,16 +57,32 @@ function asPercent(value) {
   return `${n.toFixed(1)}%`
 }
 
+/**
+ * @param {unknown} reason
+ */
+function formatReportFailure(reason) {
+  if (reason instanceof ApiError) {
+    return reason.message
+  }
+  if (reason instanceof Error) {
+    return reason.message
+  }
+  return 'Не удалось загрузить раздел'
+}
+
 export function ReportsPage() {
   const { companyId } = resolveCompanyId()
-  const period = defaultPeriod()
-  const [dateFrom, setDateFrom] = useState(period.dateFrom)
-  const [dateTo, setDateTo] = useState(period.dateTo)
+  const defaultRange = useMemo(() => defaultPeriod(), [])
+  const [dateFrom, setDateFrom] = useState(() => defaultRange.dateFrom)
+  const [dateTo, setDateTo] = useState(() => defaultRange.dateTo)
   const [employeeIdInput, setEmployeeIdInput] = useState('')
   const [teamLeadIdInput, setTeamLeadIdInput] = useState('')
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(/** @type {string | null} */ (null))
+  const [completionError, setCompletionError] = useState(/** @type {string | null} */ (null))
+  const [effectivenessError, setEffectivenessError] = useState(/** @type {string | null} */ (null))
+  const [historyError, setHistoryError] = useState(/** @type {string | null} */ (null))
   const [completion, setCompletion] = useState(
     /** @type {import('../api/reports.js').DevelopmentPlanCompletionReportView | null} */ (null),
   )
@@ -72,6 +99,9 @@ export function ReportsPage() {
       setEffectiveness(null)
       setHistory(null)
       setError(null)
+      setCompletionError(null)
+      setEffectivenessError(null)
+      setHistoryError(null)
       return
     }
     const filter = {
@@ -83,39 +113,52 @@ export function ReportsPage() {
     }
     setLoading(true)
     setError(null)
-    try {
-      const [completionReport, effectivenessReport, historyReport] = await Promise.all([
-        reportsApi.fetchDevelopmentPlansCompletionReport(filter),
-        reportsApi.fetchEffectivenessSummaryReport(filter),
-        reportsApi.fetchPromotionDecisionsHistoryReport(filter),
-      ])
-      setCompletion(completionReport)
-      setEffectiveness(effectivenessReport)
-      setHistory(historyReport)
-    } catch (e) {
+    setCompletionError(null)
+    setEffectivenessError(null)
+    setHistoryError(null)
+    const settled = await Promise.allSettled([
+      reportsApi.fetchDevelopmentPlansCompletionReport(filter),
+      reportsApi.fetchEffectivenessSummaryReport(filter),
+      reportsApi.fetchPromotionDecisionsHistoryReport(filter),
+    ])
+    const [c, e, h] = settled
+    if (c.status === 'fulfilled') {
+      setCompletion(/** @type {import('../api/reports.js').DevelopmentPlanCompletionReportView} */ (c.value))
+      setCompletionError(null)
+    } else {
       setCompletion(null)
-      setEffectiveness(null)
-      setHistory(null)
-      if (e instanceof ApiError) {
-        setError(e.message)
-      } else if (e instanceof Error) {
-        setError(e.message)
-      } else {
-        setError('Не удалось загрузить отчёты')
-      }
-    } finally {
-      setLoading(false)
+      setCompletionError(formatReportFailure(c.reason))
     }
+    if (e.status === 'fulfilled') {
+      setEffectiveness(/** @type {import('../api/reports.js').EffectivenessSummaryReportView} */ (e.value))
+      setEffectivenessError(null)
+    } else {
+      setEffectiveness(null)
+      setEffectivenessError(formatReportFailure(e.reason))
+    }
+    if (h.status === 'fulfilled') {
+      setHistory(/** @type {import('../api/reports.js').PromotionDecisionHistoryReportView} */ (h.value))
+      setHistoryError(null)
+    } else {
+      setHistory(null)
+      setHistoryError(formatReportFailure(h.reason))
+    }
+    if (c.status === 'rejected' && e.status === 'rejected' && h.status === 'rejected') {
+      setError('Ни один отчёт не загрузился. Проверьте права доступа и параметры периода.')
+    } else {
+      setError(null)
+    }
+    setLoading(false)
   }, [companyId])
 
   useEffect(() => {
     void load({
-      dateFrom: period.dateFrom,
-      dateTo: period.dateTo,
+      dateFrom: defaultRange.dateFrom,
+      dateTo: defaultRange.dateTo,
       employeeIdInput: '',
       teamLeadIdInput: '',
     })
-  }, [companyId, load, period.dateFrom, period.dateTo])
+  }, [companyId, load, defaultRange.dateFrom, defaultRange.dateTo])
 
   return (
     <article className="page">
@@ -212,6 +255,12 @@ export function ReportsPage() {
 
       {loading ? <p className="entity-zone__loading">Загрузка…</p> : null}
 
+      {!loading && effectivenessError ? (
+        <p className="entity-zone__section-error" role="status">
+          Сводка эффективности: {effectivenessError}
+        </p>
+      ) : null}
+
       {!loading && effectiveness ? (
         <>
           <h2 className="page__title">Сводка эффективности</h2>
@@ -219,6 +268,14 @@ export function ReportsPage() {
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">ИПР в срезе</div>
               <div className="entity-zone__metric-value">{effectiveness.plans_total}</div>
+            </article>
+            <article className="entity-zone__metric">
+              <div className="entity-zone__metric-label">Активных ИПР</div>
+              <div className="entity-zone__metric-value">{effectiveness.plans_active}</div>
+            </article>
+            <article className="entity-zone__metric">
+              <div className="entity-zone__metric-label">Завершённых ИПР</div>
+              <div className="entity-zone__metric-value">{effectiveness.plans_completed}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Среднее выполнение</div>
@@ -229,11 +286,37 @@ export function ReportsPage() {
               <div className="entity-zone__metric-value">{asPercent(effectiveness.on_time_done_tasks_share_percent)}</div>
             </article>
             <article className="entity-zone__metric">
+              <div className="entity-zone__metric-label">Средняя длительность задачи</div>
+              <div className="entity-zone__metric-value">
+                {Number.isFinite(Number(effectiveness.avg_task_completion_duration_days))
+                  ? `${Number(effectiveness.avg_task_completion_duration_days).toFixed(1)} дн.`
+                  : '—'}
+              </div>
+            </article>
+            <article className="entity-zone__metric">
+              <div className="entity-zone__metric-label">Итоговых ревью</div>
+              <div className="entity-zone__metric-value">{effectiveness.final_reviews_total}</div>
+            </article>
+            <article className="entity-zone__metric">
+              <div className="entity-zone__metric-label">Повышения одобрено</div>
+              <div className="entity-zone__metric-value">{effectiveness.promotion_approved_total}</div>
+            </article>
+            <article className="entity-zone__metric">
+              <div className="entity-zone__metric-label">Повышения отклонено</div>
+              <div className="entity-zone__metric-value">{effectiveness.promotion_rejected_total}</div>
+            </article>
+            <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Конверсия в повышение</div>
               <div className="entity-zone__metric-value">{asPercent(effectiveness.promotion_conversion_percent)}</div>
             </article>
           </div>
         </>
+      ) : null}
+
+      {!loading && completionError ? (
+        <p className="entity-zone__section-error" role="status">
+          Выполнение ИПР: {completionError}
+        </p>
       ) : null}
 
       {!loading && completion ? (
@@ -253,35 +336,64 @@ export function ReportsPage() {
               <div className="entity-zone__metric-value">{completion.tasks_done}</div>
             </article>
             <article className="entity-zone__metric">
+              <div className="entity-zone__metric-label">В работе</div>
+              <div className="entity-zone__metric-value">{completion.tasks_in_progress}</div>
+            </article>
+            <article className="entity-zone__metric">
+              <div className="entity-zone__metric-label">Запланировано</div>
+              <div className="entity-zone__metric-value">{completion.tasks_planned}</div>
+            </article>
+            <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Среднее выполнение ИПР</div>
               <div className="entity-zone__metric-value">{asPercent(completion.avg_plan_completion_percent)}</div>
+            </article>
+            <article className="entity-zone__metric">
+              <div className="entity-zone__metric-label">Доля задач в срок</div>
+              <div className="entity-zone__metric-value">{asPercent(completion.on_time_done_tasks_share_percent)}</div>
             </article>
           </div>
 
           {completion.items.length > 0 ? (
             <div className="entity-zone__grid">
-              {completion.items.map((item) => (
-                <article key={item.plan_id} className="entity-zone__card">
-                  <div className="entity-zone__card-name">{item.employee_name}</div>
-                  <div className="entity-zone__card-code">
-                    {item.team_lead_name ? `Тимлид: ${item.team_lead_name}` : 'Тимлид не указан'}
-                  </div>
-                  <div className="entity-zone__card-meta">
-                    <span className="entity-zone__badge">{item.plan_status}</span>
-                    <span className="entity-zone__badge">{asPercent(item.completion_percent)}</span>
-                  </div>
-                  <p className="entity-zone__card-desc">
-                    Период: {item.period_start} — {item.period_end}
-                    <br />
-                    Задачи: {item.done_tasks_count}/{item.total_tasks_count} выполнено
-                  </p>
-                </article>
-              ))}
+              {completion.items.map((item) => {
+                const st = typeof item.plan_status === 'string' ? item.plan_status.toUpperCase() : item.plan_status
+                const statusLabel =
+                  PLAN_STATUS_LABEL[/** @type {keyof typeof PLAN_STATUS_LABEL} */ (st)] ?? item.plan_status
+                return (
+                  <article key={item.plan_id} className="entity-zone__card entity-zone__card--panel">
+                    <div className="entity-zone__card-name">{item.employee_name}</div>
+                    <div className="entity-zone__card-code">
+                      {item.team_lead_name ? `Тимлид: ${item.team_lead_name}` : 'Тимлид не указан'}
+                    </div>
+                    <div className="entity-zone__card-meta">
+                      <span className="entity-zone__badge">{statusLabel}</span>
+                      <span className="entity-zone__badge">{asPercent(item.completion_percent)}</span>
+                    </div>
+                    <p className="entity-zone__card-desc">
+                      Период: {item.period_start} — {item.period_end}
+                      <br />
+                      Задачи: {item.done_tasks_count}/{item.total_tasks_count} выполнено
+                      {item.in_progress_tasks_count != null || item.planned_tasks_count != null ? (
+                        <>
+                          <br />
+                          В работе: {item.in_progress_tasks_count ?? '—'}, запланировано: {item.planned_tasks_count ?? '—'}
+                        </>
+                      ) : null}
+                    </p>
+                  </article>
+                )
+              })}
             </div>
           ) : (
             <p className="entity-zone__empty">По текущим фильтрам нет строк отчёта выполнения ИПР.</p>
           )}
         </>
+      ) : null}
+
+      {!loading && historyError ? (
+        <p className="entity-zone__section-error" role="status">
+          История кадровых решений: {historyError}
+        </p>
       ) : null}
 
       {!loading && history ? (
@@ -303,19 +415,24 @@ export function ReportsPage() {
           </div>
           {history.items.length > 0 ? (
             <div className="entity-zone__grid">
-              {history.items.map((item) => (
-                <article key={item.decision_id} className="entity-zone__card">
-                  <div className="entity-zone__card-name">{item.employee_name}</div>
-                  <div className="entity-zone__card-code">
-                    {item.from_grade_code} → {item.to_grade_code ?? '—'}
-                  </div>
-                  <div className="entity-zone__card-meta">
-                    <span className="entity-zone__badge">{item.decision}</span>
-                    <span className="entity-zone__badge">{new Date(item.decided_at).toLocaleDateString('ru-RU')}</span>
-                  </div>
-                  <p className="entity-zone__card-desc">{item.rationale}</p>
-                </article>
-              ))}
+              {history.items.map((item) => {
+                const d = typeof item.decision === 'string' ? item.decision.toUpperCase() : item.decision
+                const decisionLabel =
+                  DECISION_LABEL[/** @type {keyof typeof DECISION_LABEL} */ (d)] ?? item.decision
+                return (
+                  <article key={item.decision_id} className="entity-zone__card entity-zone__card--panel">
+                    <div className="entity-zone__card-name">{item.employee_name}</div>
+                    <div className="entity-zone__card-code">
+                      {item.from_grade_code} → {item.to_grade_code ?? '—'}
+                    </div>
+                    <div className="entity-zone__card-meta">
+                      <span className="entity-zone__badge">{decisionLabel}</span>
+                      <span className="entity-zone__badge">{new Date(item.decided_at).toLocaleDateString('ru-RU')}</span>
+                    </div>
+                    <p className="entity-zone__card-desc">{item.rationale}</p>
+                  </article>
+                )
+              })}
             </div>
           ) : (
             <p className="entity-zone__empty">История решений за период пуста.</p>

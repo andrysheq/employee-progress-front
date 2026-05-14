@@ -248,6 +248,16 @@
   line-height: 1.5;
 }
 
+.entity-zone__section-error {
+  font-size: 0.8125rem;
+  color: #991b1b;
+  margin: 0 0 1rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
 @media (max-width: 640px) {
   .entity-zone__grades-head,
   .entity-zone__grades-row {
@@ -270,6 +280,52 @@
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0.75rem;
   margin-bottom: 1rem;
+}
+
+.entity-zone__filters--row {
+  grid-template-columns: minmax(220px, 1fr);
+  max-width: 520px;
+}
+
+.entity-zone__field--grow {
+  min-width: 0;
+}
+
+.entity-zone__actions--tight {
+  margin-top: 0.5rem;
+  margin-bottom: 0;
+}
+
+.entity-zone__task-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  border-top: 1px dashed var(--color-border-subtle);
+  padding-top: 0.65rem;
+}
+
+.entity-zone__task-list-item {
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 0.8125rem;
+}
+
+.entity-zone__task-list-item:last-child {
+  border-bottom: 0;
+}
+
+.entity-zone__task-list-title {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.entity-zone__task-list-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  margin-top: 0.2rem;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
 }
 
 .entity-zone__field {

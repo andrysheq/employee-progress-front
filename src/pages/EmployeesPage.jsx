@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiError, employeesApi } from '../api/index.js'
+import { ApiError, departmentsApi, employeesApi } from '../api/index.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import './pages.css'
 import './EntityZone.css'
@@ -18,6 +18,9 @@ export function EmployeesPage() {
   const [details, setDetails] = useState(
     /** @type {{ employee: import('../api/employees.js').EmployeeView, currentGrade: import('../api/employees.js').EmployeeGradeView | null, gradeHistory: import('../api/employees.js').EmployeeGradeView[] } | null} */ (null),
   )
+  const [departmentNames, setDepartmentNames] = useState(
+    /** @type {Map<number, string>} */ (new Map()),
+  )
 
   const loadEmployees = useCallback(async () => {
     if (companyId == null) {
@@ -25,12 +28,26 @@ export function EmployeesPage() {
       setError(null)
       setSelectedEmployeeId(null)
       setDetails(null)
+      setDepartmentNames(new Map())
       return
     }
     setLoading(true)
     setError(null)
     try {
-      const list = await employeesApi.fetchEmployeesByCompany(companyId)
+      const [list, depts] = await Promise.all([
+        employeesApi.fetchEmployeesByCompany(companyId),
+        departmentsApi.fetchDepartmentsByCompany(companyId, false).catch(() => []),
+      ])
+      const nextDeptNames = new Map()
+      if (Array.isArray(depts)) {
+        for (const d of depts) {
+          const id = Number(d?.id)
+          if (Number.isFinite(id) && id > 0 && typeof d?.name === 'string' && d.name.trim() !== '') {
+            nextDeptNames.set(Math.trunc(id), d.name.trim())
+          }
+        }
+      }
+      setDepartmentNames(nextDeptNames)
       setEmployees(Array.isArray(list) ? list : [])
     } catch (e) {
       setEmployees(null)
@@ -93,12 +110,18 @@ export function EmployeesPage() {
       setDetailsLoading(false)
       return
     }
+    const ids = new Set(employees.map((e) => e.id))
     const firstEmployeeId = Number(employees[0]?.id)
     if (!Number.isFinite(firstEmployeeId) || firstEmployeeId <= 0) {
       return
     }
+    const firstId = Math.trunc(firstEmployeeId)
+    if (selectedEmployeeId != null && !ids.has(selectedEmployeeId)) {
+      void loadEmployeeDetails(firstId)
+      return
+    }
     if (selectedEmployeeId == null) {
-      void loadEmployeeDetails(Math.trunc(firstEmployeeId))
+      void loadEmployeeDetails(firstId)
     }
   }, [employees, selectedEmployeeId, loadEmployeeDetails])
 
@@ -152,7 +175,9 @@ export function EmployeesPage() {
                     <div className="entity-zone__card-code">{employee.email}</div>
                     <div className="entity-zone__card-meta">
                       <span className="entity-zone__badge">ID: {employee.id}</span>
-                      <span className="entity-zone__badge">Отдел: {employee.department_id}</span>
+                      <span className="entity-zone__badge">
+                        Отдел: {departmentLabel(departmentNames, employee.department_id)}
+                      </span>
                       <span
                         className={
                           employee.is_active
@@ -199,7 +224,8 @@ export function EmployeesPage() {
                 <div className="entity-zone__grades-row">
                   <span>Компания / отдел</span>
                   <span>
-                    {details.employee.company_id} / {details.employee.department_id}
+                    {details.employee.company_id} /{' '}
+                    {departmentLabel(departmentNames, details.employee.department_id)}
                   </span>
                   <span />
                 </div>
@@ -216,9 +242,7 @@ export function EmployeesPage() {
                   <div className="entity-zone__grades-table">
                     <div className="entity-zone__grades-row">
                       <span>Грейд</span>
-                      <span>
-                        {details.currentGrade.grade_code} — {details.currentGrade.grade_name}
-                      </span>
+                      <span>{details.currentGrade.grade_name}</span>
                       <span />
                     </div>
                     <div className="entity-zone__grades-row">
@@ -248,9 +272,7 @@ export function EmployeesPage() {
                   <div className="entity-zone__grades-table">
                     {details.gradeHistory.map((row) => (
                       <div key={row.employee_grade_id} className="entity-zone__grades-row">
-                        <span>
-                          {row.grade_code} — {row.grade_name}
-                        </span>
+                        <span>{row.grade_name}</span>
                         <span>
                           {formatDate(row.start_date)} — {formatDate(row.end_date)}
                         </span>
@@ -283,4 +305,16 @@ function formatDate(value) {
     return String(value)
   }
   return date.toLocaleDateString('ru-RU')
+}
+
+/**
+ * @param {Map<number, string>} departmentNames
+ * @param {number} departmentId
+ */
+function departmentLabel(departmentNames, departmentId) {
+  const id = Math.trunc(Number(departmentId))
+  if (!Number.isFinite(id) || id <= 0) {
+    return '—'
+  }
+  return departmentNames.get(id) ?? `№${id}`
 }
