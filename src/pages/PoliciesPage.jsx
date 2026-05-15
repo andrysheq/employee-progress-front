@@ -337,9 +337,9 @@ export function PoliciesPage() {
       ) : null}
 
       {!loading && policies && policies.length > 0 ? (
-        <div className="entity-zone__grid">
+        <div className="entity-zone__grid entity-zone__grid--idp">
           {policies.map((pol) => (
-            <article key={pol.id} className="entity-zone__card">
+            <article key={pol.id} className="entity-zone__card entity-zone__card--panel">
               <div className="entity-zone__card-name">{pol.name}</div>
               <div className="entity-zone__card-meta">
                 <span
@@ -357,9 +357,13 @@ export function PoliciesPage() {
                 </span>
               </div>
               <p className="entity-zone__card-desc">
-                Интервал между ревью: {pol.min_months_between_reviews} мес. · Минимум выполнения ИПР:{' '}
-                {displayDecimal(pol.min_completion_percent)}% · Веса: тимлид {displayDecimal(pol.weight_team_lead)} /
-                менеджер {displayDecimal(pol.weight_manager)}
+                Интервал между ревью: {pol.min_months_between_reviews} мес.
+              </p>
+              <p className="entity-zone__card-desc entity-zone__task-stats">
+                Минимум выполнения ИПР: {displayDecimal(pol.min_completion_percent)}%
+              </p>
+              <p className="entity-zone__card-desc entity-zone__task-stats">
+                Тимлид {displayDecimal(pol.weight_team_lead)}% / Директор отдела {displayDecimal(pol.weight_manager)}%
               </p>
               {canManage ? (
                 <div className="entity-zone__actions entity-zone__actions--tight">

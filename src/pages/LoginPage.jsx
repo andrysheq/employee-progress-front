@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { loginWithEmailPassword } from '../api/usersAuth.js'
 import { useAuth } from '../auth/useAuth.js'
 import './LoginPage.css'
@@ -7,6 +7,7 @@ import './LoginPage.css'
 export function LoginPage() {
   const { isAuthenticated, setSessionToken } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -23,7 +24,12 @@ export function LoginPage() {
     try {
       const token = await loginWithEmailPassword(email.trim(), password)
       setSessionToken(token)
-      navigate('/', { replace: true })
+      const from = location.state?.from
+      const to =
+        from && typeof from === 'object' && typeof from.pathname === 'string' && from.pathname !== '/login'
+          ? from
+          : '/'
+      navigate(to, { replace: true })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка входа')
     } finally {
@@ -80,10 +86,6 @@ export function LoginPage() {
           Если у вас нет доступа, обратитесь к администратору системы.
         </p>
       </div>
-
-      <p className="login-back">
-        <Link to="/">← На главную</Link>
-      </p>
     </div>
   )
 }

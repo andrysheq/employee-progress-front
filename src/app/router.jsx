@@ -1,4 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom'
+import { RequireAuth } from '../auth/RequireAuth.jsx'
 import { AppShell } from '../layout/AppShell'
 import { LoginPage } from '../pages/LoginPage'
 import { HomePage } from '../pages/HomePage'
@@ -9,6 +10,7 @@ import { EmployeesPage } from '../pages/EmployeesPage'
 import { EmployeeDetailsPage } from '../pages/EmployeeDetailsPage'
 import { PoliciesPage } from '../pages/PoliciesPage'
 import { DevelopmentPlansPage } from '../pages/DevelopmentPlansPage'
+import { DevelopmentPlanCreatePage } from '../pages/DevelopmentPlanCreatePage'
 import { DevelopmentPlanDetailsPage } from '../pages/DevelopmentPlanDetailsPage'
 import { DevelopmentPlanTaskPage } from '../pages/DevelopmentPlanTaskPage'
 import { ReviewsPage } from '../pages/ReviewsPage'
@@ -25,7 +27,11 @@ export const router = createBrowserRouter([
   },
   {
     path: '/',
-    element: <AppShell />,
+    element: (
+      <RequireAuth>
+        <AppShell />
+      </RequireAuth>
+    ),
     children: [
       { index: true, element: <HomePage /> },
       { path: 'grade-model', element: <GradeModelPage /> },
@@ -35,6 +41,7 @@ export const router = createBrowserRouter([
       { path: 'employees/:employeeId', element: <EmployeeDetailsPage /> },
       { path: 'policies', element: <PoliciesPage /> },
       { path: 'development-plans', element: <DevelopmentPlansPage /> },
+      { path: 'development-plans/new', element: <DevelopmentPlanCreatePage /> },
       { path: 'development-plans/:planId', element: <DevelopmentPlanDetailsPage /> },
       { path: 'development-plans/:planId/tasks/:taskId', element: <DevelopmentPlanTaskPage /> },
       { path: 'reviews', element: <ReviewsPage /> },

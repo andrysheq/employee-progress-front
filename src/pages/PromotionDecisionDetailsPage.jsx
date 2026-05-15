@@ -3,22 +3,13 @@ import { Link, useParams } from 'react-router-dom'
 import { ApiError, promotionDecisionsApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
 import { hasDirectorRole } from '../auth/roleChecks.js'
+import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
 import './pages.css'
 import './EntityZone.css'
 
 const DECISION_LABEL = {
   APPROVED: 'Одобрено',
   REJECTED: 'Отклонено',
-}
-
-/**
- * @param {string | null | undefined} iso
- */
-function formatDateTime(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return String(iso)
-  return d.toLocaleString('ru-RU')
 }
 
 /**
@@ -100,8 +91,8 @@ export function PromotionDecisionDetailsPage() {
                   {item.from_grade_code} → {item.to_grade_code ?? '—'}
                 </span>
               </div>
-              <p className="entity-zone__idp-hero-meta" style={{ marginTop: '0.5rem' }}>
-                <span>Принято: {formatDateTime(item.decided_at)}</span>
+              <p className="entity-zone__idp-hero-meta" style={{ marginTop: '0.5rem', flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem' }}>
+                <span>Принято: {formatDateTimeRuNoSeconds(item.decided_at)}</span>
               </p>
             </div>
             <span className={decisionChipClass(item.decision)}>{decisionLabel}</span>
@@ -122,19 +113,19 @@ export function PromotionDecisionDetailsPage() {
           <section className="entity-zone__idp-section">
             <h2 className="entity-zone__idp-section-title">Контекст</h2>
             <div className="entity-zone__idp-cards">
-              <article className="entity-zone__idp-card">
+              <article className="entity-zone__idp-card entity-zone__context-panel">
                 <p className="entity-zone__idp-muted">
-                  Принял: <strong>{item.decided_by_name}</strong>
+                  Принял: <strong className="entity-zone__context-strong">{item.decided_by_name}</strong>
                 </p>
-                <p className="entity-zone__idp-muted" style={{ marginTop: '0.35rem' }}>
+                <p className="entity-zone__idp-muted">
                   Сотрудник:{' '}
-                  <Link className="entity-zone__idp-link" to={`/employees/${item.employee_id}`}>
+                  <Link className="entity-zone__inline-link" to={`/employees/${item.employee_id}`}>
                     {item.employee_name}
                   </Link>
                 </p>
-                <p className="entity-zone__idp-muted" style={{ marginTop: '0.35rem' }}>
+                <p className="entity-zone__idp-muted">
                   Цикл ревью:{' '}
-                  <Link className="entity-zone__idp-link" to={`/reviews/${item.review_cycle_id}`}>
+                  <Link className="entity-zone__inline-link" to={`/reviews/${item.review_cycle_id}`}>
                     #{item.review_cycle_id}
                   </Link>
                 </p>

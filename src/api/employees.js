@@ -21,6 +21,14 @@ export function fetchEmployeeById(employeeId) {
 }
 
 /**
+ * Карточка сотрудника для текущего JWT: claim `employee_id`, иначе сопоставление по `auth_user_id` (= `sub`).
+ * @returns {Promise<EmployeeView>}
+ */
+export function fetchCurrentEmployee() {
+  return /** @type {Promise<EmployeeView>} */ (apiGet('/employees/me'))
+}
+
+/**
  * @typedef {object} EmployeeGradeView
  * @property {number} employee_grade_id
  * @property {number} employee_id
@@ -28,6 +36,7 @@ export function fetchEmployeeById(employeeId) {
  * @property {string} grade_code
  * @property {string} grade_name
  * @property {number} grade_level_order
+ * @property {number | null} [position_id]
  * @property {string} start_date
  * @property {string | null} [end_date]
  * @property {string | null} [change_reason]

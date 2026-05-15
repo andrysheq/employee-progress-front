@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, developmentPlansApi, employeesApi } from '../api/index.js'
+import { useAuth } from '../auth/useAuth.js'
+import { hasTeamLeadRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
 import './pages.css'
 import './EntityZone.css'
 
@@ -21,13 +24,6 @@ const TASK_PRIORITY_LABEL = {
   HIGH: 'Высокий',
   MIDDLE: 'Средний',
   LOW: 'Низкий',
-}
-
-function formatDateTime(v) {
-  if (!v) return '—'
-  const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return String(v)
-  return d.toLocaleString('ru-RU')
 }
 
 /**
@@ -82,6 +78,8 @@ function taskStatusChipClass(status) {
 export function DevelopmentPlanTaskPage() {
   const { planId, taskId } = useParams()
   const { companyId } = resolveCompanyId()
+  const { roles, employeeIdFromJwt } = useAuth()
+  const [plan, setPlan] = useState(null)
   const [task, setTask] = useState(null)
   const [progressHistory, setProgressHistory] = useState([])
   const [comments, setComments] = useState([])
@@ -89,6 +87,14 @@ export function DevelopmentPlanTaskPage() {
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  const [newComment, setNewComment] = useState('')
+  const [commentBusy, setCommentBusy] = useState(false)
+  const [commentError, setCommentError] = useState(null)
+
+  const [doneScore, setDoneScore] = useState('8')
+  const [doneBusy, setDoneBusy] = useState(false)
+  const [doneError, setDoneError] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -99,7 +105,8 @@ export function DevelopmentPlanTaskPage() {
       try {
         const pId = Number(planId)
         const tId = Number(taskId)
-        const [tasks, progress, commentsData, attachmentsData, employeesPage] = await Promise.all([
+        const [planData, tasks, progress, commentsData, attachmentsData, employeesPage] = await Promise.all([
+          developmentPlansApi.fetchDevelopmentPlanById(pId),
           developmentPlansApi.fetchPlanTasks(pId),
           developmentPlansApi.fetchTaskProgressHistory(pId, tId),
           developmentPlansApi.fetchTaskComments(pId, tId),
@@ -109,6 +116,7 @@ export function DevelopmentPlanTaskPage() {
             : employeesApi.fetchEmployeesRegistry({ company_id: companyId }, { size: 300, sort: 'fullName,asc' }),
         ])
         if (cancelled) return
+        setPlan(planData)
         setTask((tasks ?? []).find((x) => Number(x.id) === tId) ?? null)
         setProgressHistory(Array.isArray(progress) ? progress : [])
         setComments(Array.isArray(commentsData) ? commentsData : [])
@@ -134,6 +142,19 @@ export function DevelopmentPlanTaskPage() {
     for (const e of employees) m.set(e.id, e.full_name)
     return m
   }, [employees])
+
+  const planExecutionReady =
+    plan != null && String(plan.status ?? '').toUpperCase() === 'ACTIVE' && Boolean(plan.approved_at)
+
+  const isPlanEmployee =
+    plan != null && employeeIdFromJwt != null && Number(plan.employee_id) === Number(employeeIdFromJwt)
+
+  const isAssignedTeamLead =
+    hasTeamLeadRole(roles) &&
+    plan != null &&
+    plan.team_lead_id != null &&
+    employeeIdFromJwt != null &&
+    Number(plan.team_lead_id) === Number(employeeIdFromJwt)
 
   const st = task ? String(task.status ?? '').toUpperCase() : ''
   const statusLabel = TASK_STATUS_LABEL[/** @type {keyof typeof TASK_STATUS_LABEL} */ (st)] ?? task?.status
@@ -170,7 +191,7 @@ export function DevelopmentPlanTaskPage() {
                 <span className="entity-zone__idp-chip">Приоритет: {priorityLabel}</span>
               </div>
               <p className="entity-zone__idp-hero-meta" style={{ marginTop: '0.5rem' }}>
-                Срок: {formatDateTime(task.due_date)}
+                Срок: {formatDateTimeRuNoSeconds(task.due_date)}
               </p>
             </div>
           </header>
@@ -192,7 +213,7 @@ export function DevelopmentPlanTaskPage() {
                   <article key={x.id} className="entity-zone__idp-card">
                     <div className="entity-zone__idp-card-head">
                       <span className="entity-zone__idp-card-title">{x.progress_percent}%</span>
-                      <span className="entity-zone__idp-chip">{formatDateTime(x.created_at)}</span>
+                      <span className="entity-zone__idp-chip">{formatDateTimeRuNoSeconds(x.created_at)}</span>
                     </div>
                     <p className="entity-zone__idp-muted">
                       {formatProgressAuthorLine(x, employeeNameById)}
@@ -217,7 +238,7 @@ export function DevelopmentPlanTaskPage() {
                 comments.map((x) => (
                   <article key={x.id} className="entity-zone__idp-card">
                     <div className="entity-zone__idp-card-head">
-                      <span className="entity-zone__idp-chip">{formatDateTime(x.created_at)}</span>
+                      <span className="entity-zone__idp-chip">{formatDateTimeRuNoSeconds(x.created_at)}</span>
                       <span className="entity-zone__idp-chip">
                         {formatCommentAuthorChip(x, employeeNameById)}
                       </span>
@@ -229,7 +250,121 @@ export function DevelopmentPlanTaskPage() {
                 ))
               )}
             </div>
+            {isPlanEmployee && planExecutionReady && task && st !== 'DONE' ? (
+              <div style={{ marginTop: '1rem' }}>
+                <h3 className="entity-zone__idp-section-title" style={{ fontSize: '1rem' }}>
+                  Новый комментарий
+                </h3>
+                <p className="entity-zone__idp-muted" style={{ marginBottom: '0.5rem' }}>
+                  Комментарии фиксируются от имени владельца ИПР (сотрудника).
+                </p>
+                <textarea
+                  className="entity-zone__input"
+                  rows={3}
+                  value={newComment}
+                  onChange={(ev) => setNewComment(ev.target.value)}
+                  placeholder="Текст комментария…"
+                />
+                {commentError ? (
+                  <div className="entity-zone__error" role="alert" style={{ marginTop: '0.35rem' }}>
+                    {commentError}
+                  </div>
+                ) : null}
+                <div className="entity-zone__actions" style={{ marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="entity-zone__button entity-zone__button--primary"
+                    disabled={commentBusy || newComment.trim() === ''}
+                    onClick={async () => {
+                      if (!planId || !taskId) return
+                      setCommentBusy(true)
+                      setCommentError(null)
+                      try {
+                        await developmentPlansApi.addDevelopmentPlanTaskComment(Number(planId), Number(taskId), {
+                          comment: newComment.trim(),
+                        })
+                        setNewComment('')
+                        const list = await developmentPlansApi.fetchTaskComments(Number(planId), Number(taskId))
+                        setComments(Array.isArray(list) ? list : [])
+                      } catch (e) {
+                        if (e instanceof ApiError) setCommentError(e.message)
+                        else if (e instanceof Error) setCommentError(e.message)
+                        else setCommentError('Не удалось отправить комментарий')
+                      } finally {
+                        setCommentBusy(false)
+                      }
+                    }}
+                  >
+                    Отправить
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </section>
+
+          {isAssignedTeamLead && planExecutionReady && task && st !== 'DONE' ? (
+            <section className="entity-zone__idp-section" aria-labelledby="task-tl-done-heading">
+              <h2 id="task-tl-done-heading" className="entity-zone__idp-section-title">
+                Завершение задачи (тимлид)
+              </h2>
+              <p className="entity-zone__idp-muted">
+                Перевод в статус «Выполнена» с обязательной оценкой по шкале 1–10.
+              </p>
+              <label className="entity-zone__field" style={{ maxWidth: '12rem' }}>
+                <span className="entity-zone__field-label">Оценка (1–10)</span>
+                <input
+                  className="entity-zone__input"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={doneScore}
+                  onChange={(ev) => setDoneScore(ev.target.value)}
+                />
+              </label>
+              {doneError ? (
+                <div className="entity-zone__error" role="alert" style={{ marginTop: '0.35rem' }}>
+                  {doneError}
+                </div>
+              ) : null}
+              <div className="entity-zone__actions" style={{ marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="entity-zone__button entity-zone__button--primary"
+                  disabled={doneBusy || employeeIdFromJwt == null}
+                  onClick={async () => {
+                    if (!planId || !taskId || employeeIdFromJwt == null) return
+                    const score = Math.trunc(Number(doneScore))
+                    if (!Number.isFinite(score) || score < 1 || score > 10) {
+                      setDoneError('Введите оценку от 1 до 10')
+                      return
+                    }
+                    setDoneBusy(true)
+                    setDoneError(null)
+                    try {
+                      const updated = await developmentPlansApi.updateDevelopmentPlanTaskStatus(
+                        Number(planId),
+                        Number(taskId),
+                        {
+                          participant_employee_id: employeeIdFromJwt,
+                          status: 'DONE',
+                          team_lead_task_score: score,
+                        },
+                      )
+                      setTask(updated)
+                    } catch (e) {
+                      if (e instanceof ApiError) setDoneError(e.message)
+                      else if (e instanceof Error) setDoneError(e.message)
+                      else setDoneError('Не удалось обновить статус')
+                    } finally {
+                      setDoneBusy(false)
+                    }
+                  }}
+                >
+                  Завершить задачу
+                </button>
+              </div>
+            </section>
+          ) : null}
 
           <section className="entity-zone__idp-section" aria-labelledby="task-attach-heading">
             <h2 id="task-attach-heading" className="entity-zone__idp-section-title">Вложения</h2>
@@ -245,8 +380,13 @@ export function DevelopmentPlanTaskPage() {
                       </a>
                     </div>
                     <p className="entity-zone__idp-muted" style={{ marginTop: '0.35rem' }}>
-                      {x.content_type ?? '—'} · {x.size_bytes != null ? `${x.size_bytes} байт` : '—'} ·{' '}
-                      {formatDateTime(x.created_at)}
+                      {x.content_type ?? '—'}
+                    </p>
+                    <p className="entity-zone__idp-muted" style={{ marginTop: '0.2rem' }}>
+                      {x.size_bytes != null ? `${x.size_bytes} байт` : '—'}
+                    </p>
+                    <p className="entity-zone__idp-muted" style={{ marginTop: '0.2rem' }}>
+                      {formatDateTimeRuNoSeconds(x.created_at)}
                     </p>
                   </article>
                 ))

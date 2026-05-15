@@ -1,22 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiError, employeesApi, reportsApi } from '../api/index.js'
+import { ApiError, reportsApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
 import { hasDirectorRole, hasTeamLeadRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import './pages.css'
 import './EntityZone.css'
-
-const PLAN_STATUS_LABEL = {
-  DRAFT: 'Черновик',
-  ACTIVE: 'Активен',
-  ARCHIVED: 'Архив',
-}
-
-const DECISION_LABEL = {
-  APPROVED: 'Одобрено',
-  REJECTED: 'Отклонено',
-}
 
 /**
  * @returns {{ dateFrom: string, dateTo: string }}
@@ -68,12 +57,6 @@ export function ReportsPage() {
   const defaultRange = useMemo(() => defaultPeriod(), [])
   const [dateFrom, setDateFrom] = useState(() => defaultRange.dateFrom)
   const [dateTo, setDateTo] = useState(() => defaultRange.dateTo)
-  const [employeeId, setEmployeeId] = useState('')
-  const [teamLeadId, setTeamLeadId] = useState('')
-
-  const [employees, setEmployees] = useState(
-    /** @type {import('../api/employees.js').EmployeeView[] | null} */ (null),
-  )
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(/** @type {string | null} */ (null))
@@ -89,35 +72,6 @@ export function ReportsPage() {
   const [history, setHistory] = useState(
     /** @type {import('../api/reports.js').PromotionDecisionHistoryReportView | null} */ (null),
   )
-
-  const loadEmployees = useCallback(async () => {
-    if (companyId == null) {
-      setEmployees(null)
-      return
-    }
-    try {
-      const page = await employeesApi.fetchEmployeesRegistry(
-        { company_id: companyId, is_active: true },
-        { size: 300, sort: 'fullName,asc' },
-      )
-      setEmployees(page.content)
-    } catch {
-      setEmployees(null)
-    }
-  }, [companyId])
-
-  useEffect(() => {
-    void loadEmployees()
-  }, [loadEmployees])
-
-  const sortedEmployees = useMemo(() => {
-    if (!employees) {
-      return []
-    }
-    return [...employees].sort((a, b) =>
-      String(a.full_name ?? '').localeCompare(String(b.full_name ?? ''), 'ru', { sensitivity: 'base' }),
-    )
-  }, [employees])
 
   const load = useCallback(async () => {
     if (companyId == null || !dateFrom || !dateTo) {
@@ -145,8 +99,6 @@ export function ReportsPage() {
       company_id: companyId,
       date_from: dateFrom,
       date_to: dateTo,
-      employee_id: employeeId ? Number(employeeId) : null,
-      team_lead_id: teamLeadId ? Number(teamLeadId) : null,
     }
 
     setLoading(true)
@@ -217,8 +169,6 @@ export function ReportsPage() {
     companyId,
     dateFrom,
     dateTo,
-    employeeId,
-    teamLeadId,
   ])
 
   useEffect(() => {
@@ -257,28 +207,6 @@ export function ReportsPage() {
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Период: по</span>
           <input className="entity-zone__input" type="date" value={dateTo} onChange={(ev) => setDateTo(ev.target.value)} />
-        </label>
-        <label className="entity-zone__field">
-          <span className="entity-zone__field-label">Сотрудник</span>
-          <select className="entity-zone__select" value={employeeId} onChange={(ev) => setEmployeeId(ev.target.value)}>
-            <option value="">Все</option>
-            {sortedEmployees.map((employee) => (
-              <option key={employee.id} value={String(employee.id)}>
-                {employee.full_name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="entity-zone__field">
-          <span className="entity-zone__field-label">Тимлид</span>
-          <select className="entity-zone__select" value={teamLeadId} onChange={(ev) => setTeamLeadId(ev.target.value)}>
-            <option value="">Все</option>
-            {sortedEmployees.map((employee) => (
-              <option key={employee.id} value={String(employee.id)}>
-                {employee.full_name}
-              </option>
-            ))}
-          </select>
         </label>
       </form>
 
@@ -393,41 +321,6 @@ export function ReportsPage() {
               <div className="entity-zone__metric-value">{asPercent(completion.on_time_done_tasks_share_percent)}</div>
             </article>
           </div>
-
-          {completion.items.length > 0 ? (
-            <div className="entity-zone__grid">
-              {completion.items.map((item) => {
-                const st = typeof item.plan_status === 'string' ? item.plan_status.toUpperCase() : item.plan_status
-                const statusLabel =
-                  PLAN_STATUS_LABEL[/** @type {keyof typeof PLAN_STATUS_LABEL} */ (st)] ?? item.plan_status
-                return (
-                  <article key={item.plan_id} className="entity-zone__card entity-zone__card--panel">
-                    <div className="entity-zone__card-name">{item.employee_name}</div>
-                    <div className="entity-zone__card-code">
-                      {item.team_lead_name ? `Тимлид: ${item.team_lead_name}` : 'Тимлид не указан'}
-                    </div>
-                    <div className="entity-zone__card-meta">
-                      <span className="entity-zone__badge">{statusLabel}</span>
-                      <span className="entity-zone__badge">{asPercent(item.completion_percent)}</span>
-                    </div>
-                    <p className="entity-zone__card-desc">
-                      Период: {item.period_start} — {item.period_end}
-                      <br />
-                      Задачи: {item.done_tasks_count}/{item.total_tasks_count} выполнено
-                      {item.in_progress_tasks_count != null || item.planned_tasks_count != null ? (
-                        <>
-                          <br />
-                          В работе: {item.in_progress_tasks_count ?? '—'}, запланировано: {item.planned_tasks_count ?? '—'}
-                        </>
-                      ) : null}
-                    </p>
-                  </article>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="entity-zone__empty">По текущим фильтрам нет строк отчёта выполнения ИПР.</p>
-          )}
         </>
       ) : null}
 
@@ -454,29 +347,9 @@ export function ReportsPage() {
               <div className="entity-zone__metric-value">{history.rejected_total}</div>
             </article>
           </div>
-          {history.items.length > 0 ? (
-            <div className="entity-zone__grid">
-              {history.items.map((item) => {
-                const d = typeof item.decision === 'string' ? item.decision.toUpperCase() : item.decision
-                const decisionLabel = DECISION_LABEL[/** @type {keyof typeof DECISION_LABEL} */ (d)] ?? item.decision
-                return (
-                  <article key={item.decision_id} className="entity-zone__card entity-zone__card--panel">
-                    <div className="entity-zone__card-name">{item.employee_name}</div>
-                    <div className="entity-zone__card-code">
-                      {item.from_grade_code} → {item.to_grade_code ?? '—'}
-                    </div>
-                    <div className="entity-zone__card-meta">
-                      <span className="entity-zone__badge">{decisionLabel}</span>
-                      <span className="entity-zone__badge">{new Date(item.decided_at).toLocaleDateString('ru-RU')}</span>
-                    </div>
-                    <p className="entity-zone__card-desc">{item.rationale}</p>
-                  </article>
-                )
-              })}
-            </div>
-          ) : (
+          {history.decisions_total === 0 ? (
             <p className="entity-zone__empty">История решений за период пуста.</p>
-          )}
+          ) : null}
         </>
       ) : null}
     </article>

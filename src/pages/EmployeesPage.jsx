@@ -121,9 +121,12 @@ export function EmployeesPage() {
       {!loading && employees && employees.length > 0 ? (
         <>
           <p className="entity-zone__muted">Нажмите на карточку, чтобы открыть профиль сотрудника.</p>
-          <div className="entity-zone__grid entity-zone__grid--employees">
+          <div className="entity-zone__grid entity-zone__grid--idp entity-zone__grid--employees">
             {employees.map((employee) => (
-              <article key={employee.id} className="entity-zone__card entity-zone__card--panel">
+              <article
+                key={employee.id}
+                className="entity-zone__card entity-zone__card--panel entity-zone__card--clickable"
+              >
                 <button
                   type="button"
                   className="entity-zone__card-select"

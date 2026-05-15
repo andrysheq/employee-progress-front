@@ -4,27 +4,13 @@ import { ApiError, employeesApi, promotionDecisionsApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
 import { hasDirectorRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
 import './pages.css'
 import './EntityZone.css'
 
 const DECISION_LABEL = {
   APPROVED: 'Одобрено',
   REJECTED: 'Отклонено',
-}
-
-/**
- * @param {string | null | undefined} iso
- * @returns {string}
- */
-function formatDateTime(iso) {
-  if (!iso) {
-    return '—'
-  }
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) {
-    return iso
-  }
-  return d.toLocaleString('ru-RU')
 }
 
 /**
@@ -244,7 +230,10 @@ export function PromotionDecisionsPage() {
                 </div>
                 <p className="entity-zone__card-desc">{truncate(item.rationale, 180)}</p>
                 <p className="entity-zone__card-desc entity-zone__task-stats">
-                  Принял: {item.decided_by_name} · {formatDateTime(item.decided_at)}
+                  Принял: {item.decided_by_name}
+                </p>
+                <p className="entity-zone__card-desc entity-zone__task-stats">
+                  Дата: {formatDateTimeRuNoSeconds(item.decided_at)}
                 </p>
                 {item.improvement_plan_summary ? (
                   <p className="entity-zone__card-desc">План улучшений: {truncate(item.improvement_plan_summary, 120)}</p>

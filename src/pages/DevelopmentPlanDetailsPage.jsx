@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, developmentPlansApi, employeesApi } from '../api/index.js'
+import { useAuth } from '../auth/useAuth.js'
+import { hasTeamLeadRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import './pages.css'
 import './EntityZone.css'
@@ -56,14 +58,96 @@ function planStatusChipClass(status) {
   return 'entity-zone__idp-chip entity-zone__idp-chip--status-planned'
 }
 
+/**
+ * @param {object} props
+ * @param {number} props.planId
+ * @param {import('../api/developmentPlans.js').DevelopmentPlanCompetencyItemView} props.item
+ * @param {number} props.participantEmployeeId
+ * @param {() => Promise<void>} props.onUpdated
+ */
+function CompetencyTeamLeadApproveForm({ planId, item, participantEmployeeId, onUpdated }) {
+  const [comment, setComment] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [localError, setLocalError] = useState(null)
+
+  if (item.approved) {
+    return null
+  }
+
+  return (
+    <div style={{ marginTop: '0.75rem' }}>
+      <label className="entity-zone__field entity-zone__field--grow">
+        <span className="entity-zone__field-label">Комментарий при подтверждении (необязательно)</span>
+        <textarea
+          className="entity-zone__input"
+          rows={2}
+          value={comment}
+          onChange={(ev) => setComment(ev.target.value)}
+        />
+      </label>
+      {localError ? (
+        <p className="entity-zone__error" role="alert" style={{ marginTop: '0.35rem' }}>
+          {localError}
+        </p>
+      ) : null}
+      <div className="entity-zone__actions" style={{ marginTop: '0.5rem' }}>
+        <button
+          type="button"
+          className="entity-zone__button entity-zone__button--primary"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true)
+            setLocalError(null)
+            try {
+              await developmentPlansApi.teamLeadApproveCompetencyItem(planId, item.id, {
+                participant_employee_id: participantEmployeeId,
+                comment: comment.trim() === '' ? null : comment.trim(),
+              })
+              setComment('')
+              await onUpdated()
+            } catch (e) {
+              if (e instanceof ApiError) setLocalError(e.message)
+              else if (e instanceof Error) setLocalError(e.message)
+              else setLocalError('Не удалось подтвердить компетенцию')
+            } finally {
+              setBusy(false)
+            }
+          }}
+        >
+          Подтвердить компетенцию
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function DevelopmentPlanDetailsPage() {
   const { planId } = useParams()
   const { companyId } = resolveCompanyId()
+  const { roles, employeeIdFromJwt } = useAuth()
   const [plan, setPlan] = useState(null)
   const [competencies, setCompetencies] = useState([])
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [archiveBusy, setArchiveBusy] = useState(false)
+  const [archiveError, setArchiveError] = useState(null)
+
+  const loadAll = useCallback(async () => {
+    if (!planId) return
+    const id = Number(planId)
+    if (!Number.isFinite(id)) return
+    const [planData, competencyItems, employeesPage] = await Promise.all([
+      developmentPlansApi.fetchDevelopmentPlanById(id),
+      developmentPlansApi.fetchPlanCompetencyItems(id),
+      companyId == null
+        ? Promise.resolve({ content: [] })
+        : employeesApi.fetchEmployeesRegistry({ company_id: companyId }, { size: 300, sort: 'fullName,asc' }),
+    ])
+    setPlan(planData)
+    setCompetencies(Array.isArray(competencyItems) ? competencyItems : [])
+    setEmployees(Array.isArray(employeesPage?.content) ? employeesPage.content : [])
+  }, [planId, companyId])
 
   useEffect(() => {
     let cancelled = false
@@ -71,19 +155,9 @@ export function DevelopmentPlanDetailsPage() {
       if (!planId) return
       setLoading(true)
       setError(null)
+      setArchiveError(null)
       try {
-        const id = Number(planId)
-        const [planData, competencyItems, employeesPage] = await Promise.all([
-          developmentPlansApi.fetchDevelopmentPlanById(id),
-          developmentPlansApi.fetchPlanCompetencyItems(id),
-          companyId == null
-            ? Promise.resolve({ content: [] })
-            : employeesApi.fetchEmployeesRegistry({ company_id: companyId }, { size: 300, sort: 'fullName,asc' }),
-        ])
-        if (cancelled) return
-        setPlan(planData)
-        setCompetencies(Array.isArray(competencyItems) ? competencyItems : [])
-        setEmployees(Array.isArray(employeesPage?.content) ? employeesPage.content : [])
+        await loadAll()
       } catch (e) {
         if (cancelled) return
         if (e instanceof ApiError) setError(e.message)
@@ -97,7 +171,7 @@ export function DevelopmentPlanDetailsPage() {
     return () => {
       cancelled = true
     }
-  }, [planId, companyId])
+  }, [planId, loadAll])
 
   const employeeNameById = useMemo(() => {
     const m = new Map()
@@ -107,6 +181,23 @@ export function DevelopmentPlanDetailsPage() {
 
   const planStatusKey = plan ? String(plan.status ?? '').toUpperCase() : ''
   const planStatusLabel = PLAN_STATUS_LABEL[/** @type {keyof typeof PLAN_STATUS_LABEL} */ (planStatusKey)] ?? plan?.status
+
+  const isTeamLeadForPlan =
+    hasTeamLeadRole(roles) &&
+    plan != null &&
+    plan.team_lead_id != null &&
+    employeeIdFromJwt != null &&
+    Number(plan.team_lead_id) === Number(employeeIdFromJwt)
+
+  const planActiveAndApproved =
+    plan != null && String(plan.status ?? '').toUpperCase() === 'ACTIVE' && Boolean(plan.approved_at)
+
+  const reloadCompetenciesOnly = useCallback(async () => {
+    if (!planId) return
+    const id = Number(planId)
+    const items = await developmentPlansApi.fetchPlanCompetencyItems(id)
+    setCompetencies(Array.isArray(items) ? items : [])
+  }, [planId])
 
   return (
     <article className="page">
@@ -134,6 +225,46 @@ export function DevelopmentPlanDetailsPage() {
             </div>
             <span className={planStatusChipClass(plan.status)}>{planStatusLabel}</span>
           </header>
+
+          {isTeamLeadForPlan && planActiveAndApproved ? (
+            <section className="entity-zone__idp-section" aria-labelledby="idp-tl-actions-heading">
+              <h2 id="idp-tl-actions-heading" className="entity-zone__idp-section-title">
+                Действия тимлида
+              </h2>
+              <p className="entity-zone__idp-muted">
+                Архивация доступна, когда все задачи завершены с оценкой тимлида (1–10) и все компетенции подтверждены.
+              </p>
+              {archiveError ? (
+                <div className="entity-zone__error" role="alert" style={{ marginTop: '0.5rem' }}>
+                  {archiveError}
+                </div>
+              ) : null}
+              <div className="entity-zone__actions" style={{ marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="entity-zone__button entity-zone__button--primary"
+                  disabled={archiveBusy}
+                  onClick={async () => {
+                    if (!plan?.id) return
+                    setArchiveBusy(true)
+                    setArchiveError(null)
+                    try {
+                      await developmentPlansApi.changeDevelopmentPlanStatus(plan.id, { status: 'ARCHIVED' })
+                      await loadAll()
+                    } catch (e) {
+                      if (e instanceof ApiError) setArchiveError(e.message)
+                      else if (e instanceof Error) setArchiveError(e.message)
+                      else setArchiveError('Не удалось архивировать ИПР')
+                    } finally {
+                      setArchiveBusy(false)
+                    }
+                  }}
+                >
+                  Архивировать ИПР
+                </button>
+              </div>
+            </section>
+          ) : null}
 
           <section className="entity-zone__idp-section" aria-labelledby="idp-tasks-heading">
             <h2 id="idp-tasks-heading" className="entity-zone__idp-section-title">Задачи</h2>
@@ -167,8 +298,12 @@ export function DevelopmentPlanDetailsPage() {
                       ) : null}
                       <p className="entity-zone__idp-muted" style={{ marginTop: '0.5rem' }}>
                         Срок: {formatDate(task.due_date)}
-                        {task.team_lead_task_score != null ? ` · Оценка тимлида: ${task.team_lead_task_score}` : ''}
                       </p>
+                      {task.team_lead_task_score != null ? (
+                        <p className="entity-zone__idp-muted" style={{ marginTop: '0.25rem' }}>
+                          Оценка тимлида: {task.team_lead_task_score}
+                        </p>
+                      ) : null}
                     </article>
                   )
                 })
@@ -198,13 +333,30 @@ export function DevelopmentPlanDetailsPage() {
                         {c.approved ? 'Подтверждена' : 'Не подтверждена'}
                       </span>
                     </div>
-                    <p className="entity-zone__idp-muted">
+                    {c.employee_progress_notes?.trim() ? (
+                      <p className="entity-zone__idp-muted" style={{ marginTop: '0.35rem', whiteSpace: 'pre-wrap' }}>
+                        Прогресс сотрудника: {c.employee_progress_notes}
+                      </p>
+                    ) : (
+                      <p className="entity-zone__idp-muted" style={{ marginTop: '0.35rem' }}>
+                        Прогресс сотрудника: —
+                      </p>
+                    )}
+                    <p className="entity-zone__idp-muted" style={{ marginTop: '0.35rem' }}>
                       Комментарий тимлида: {c.team_lead_comment?.trim() ? c.team_lead_comment : '—'}
                     </p>
                     <p className="entity-zone__idp-muted" style={{ marginTop: '0.35rem' }}>
                       Связанные задачи:{' '}
                       {c.related_task_ids?.length ? c.related_task_ids.join(', ') : 'не найдены'}
                     </p>
+                    {isTeamLeadForPlan && planActiveAndApproved && employeeIdFromJwt != null ? (
+                      <CompetencyTeamLeadApproveForm
+                        planId={plan.id}
+                        item={c}
+                        participantEmployeeId={employeeIdFromJwt}
+                        onUpdated={reloadCompetenciesOnly}
+                      />
+                    ) : null}
                   </article>
                 ))
               )}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, gradeModelApi } from '../api/index.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import { ConfirmDialog } from '../components/ConfirmDialog.jsx'
@@ -17,6 +17,7 @@ function trimToNull(value) {
 
 export function GradeModelPage() {
   const { companyId } = resolveCompanyId()
+  const navigate = useNavigate()
   const canManage = true
 
   const [onlyActive, setOnlyActive] = useState(true)
@@ -232,16 +233,31 @@ export function GradeModelPage() {
       ) : null}
 
       {!loading && positions.length > 0 ? (
-        <div className="entity-zone__grid">
+        <div className="entity-zone__grid entity-zone__grid--idp">
           {positions.map((row) => {
             const p = row.position
             const grades = Array.isArray(row.grades) ? row.grades : []
+            const positionUrl = `/grade-model/positions/${p.id}`
 
             return (
-              <article key={p.id} className="entity-zone__card entity-zone__card--panel">
+              <article
+                key={p.id}
+                className="entity-zone__card entity-zone__card--panel entity-zone__card--clickable"
+                role="link"
+                tabIndex={0}
+                aria-label={`Открыть грейды должности: ${p.name ?? ''}`}
+                onClick={() => navigate(positionUrl)}
+                onKeyDown={(ev) => {
+                  if (ev.key === 'Enter' || ev.key === ' ') {
+                    ev.preventDefault()
+                    navigate(positionUrl)
+                  }
+                }}
+              >
                 <div className="entity-zone__card-head">
                   <div>
                     <div className="entity-zone__card-name">{p.name}</div>
+                    {p.code ? <div className="entity-zone__card-code">{p.code}</div> : null}
                   </div>
                 </div>
 
@@ -255,12 +271,7 @@ export function GradeModelPage() {
                   >
                     {p.is_active ? 'Должность активна' : 'Должность неактивна'}
                   </span>
-                  <Link
-                    to={`/grade-model/positions/${p.id}`}
-                    className="entity-zone__badge entity-zone__badge-link"
-                  >
-                    {grades.length} грейдов
-                  </Link>
+                  <span className="entity-zone__badge">{grades.length} грейдов</span>
 
                   {canManage ? (
                     <span className="entity-zone__icon-actions">
@@ -269,21 +280,27 @@ export function GradeModelPage() {
                         className="entity-zone__icon-button"
                         title="Редактировать должность"
                         aria-label="Редактировать должность"
-                        onClick={() => openEditPosition(p)}
+                        onClick={(ev) => {
+                          ev.stopPropagation()
+                          openEditPosition(p)
+                        }}
                         disabled={submitting}
                       >
                         ✎
-              </button>
+                      </button>
                       <button
                         type="button"
                         className="entity-zone__icon-button entity-zone__icon-button--danger"
                         title="Деактивировать должность"
                         aria-label="Деактивировать должность"
-                        onClick={() => setPositionToDeactivate(p.id)}
+                        onClick={(ev) => {
+                          ev.stopPropagation()
+                          setPositionToDeactivate(p.id)
+                        }}
                         disabled={submitting || !p.is_active}
                       >
                         −
-              </button>
+                      </button>
                     </span>
                   ) : null}
                 </div>

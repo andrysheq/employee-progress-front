@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, employeesApi, reviewCyclesApi } from '../api/index.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
 import './pages.css'
 import './EntityZone.css'
 
@@ -19,23 +20,6 @@ const STATUS_LABEL = {
 const RECOMMENDATION_LABEL = {
   CONTINUE: 'Продолжить без изменений',
   ADJUST: 'Скорректировать план',
-}
-
-/**
- * @param {string | null | undefined} iso
- */
-function formatDateTimeNoSeconds(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return String(iso)
-  return d.toLocaleString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
 }
 
 /**
@@ -157,9 +141,9 @@ export function ReviewCycleDetailsPage() {
                 className="entity-zone__idp-hero-meta"
                 style={{ marginTop: '0.5rem', flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem' }}
               >
-                <span>Плановая дата: {formatDateTimeNoSeconds(cycle.scheduled_at)}</span>
-                <span>Начато: {formatDateTimeNoSeconds(cycle.started_at)}</span>
-                <span>Завершено: {formatDateTimeNoSeconds(cycle.completed_at)}</span>
+                <span>Плановая дата: {formatDateTimeRuNoSeconds(cycle.scheduled_at)}</span>
+                <span>Начато: {formatDateTimeRuNoSeconds(cycle.started_at)}</span>
+                <span>Завершено: {formatDateTimeRuNoSeconds(cycle.completed_at)}</span>
               </div>
             </div>
             <span className={reviewStatusChipClass(cycle.status)}>

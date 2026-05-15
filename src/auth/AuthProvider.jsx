@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AuthContext } from './authContext.js'
 import { parseJwtPayload } from './jwtPayload.js'
 import { getAccessToken } from '../api/token.js'
-import { fetchEmployeeDisplayName } from '../api/employees.js'
+import { fetchEmployeeDisplayName, fetchCurrentEmployee } from '../api/employees.js'
 import { COMPANY_CLAIM, EMPLOYEE_CLAIM } from '../config/companyContext.js'
 import { normalizeJwtRoles, getVisibleNavItems } from './roleNav.js'
 
@@ -15,7 +15,7 @@ import { normalizeJwtRoles, getVisibleNavItems } from './roleNav.js'
  * @property {string | null} subject
  * @property {string | null} displayName
  * @property {number | null} companyIdFromJwt
- * @property {number | null} employeeIdFromJwt
+ * @property {number | null} employeeIdFromJwt Идентификатор сотрудника для API: из `GET /employees/me` при успехе, иначе claim `employee_id`.
  * @property {import('../layout/navConfig.js').NavItem[]} visibleNavItems
  * @property {(accessToken: string) => void} setSessionToken
  * @property {() => void} clearSession
@@ -25,6 +25,7 @@ import { normalizeJwtRoles, getVisibleNavItems } from './roleNav.js'
 export function AuthProvider({ children }) {
   const [version, setVersion] = useState(0)
   const [resolvedDisplayName, setResolvedDisplayName] = useState(null)
+  const [resolvedEmployeeIdFromMe, setResolvedEmployeeIdFromMe] = useState(/** @type {number | null} */ (null))
 
   const snapshot = useMemo(() => {
     void version
@@ -36,10 +37,20 @@ export function AuthProvider({ children }) {
         subject: null,
         displayName: null,
         companyIdFromJwt: null,
-        employeeIdFromJwt: null,
+        jwtEmployeeIdClaim: null,
       }
     }
     const payload = parseJwtPayload(token)
+    if (!payload) {
+      return {
+        isAuthenticated: false,
+        roles: /** @type {string[]} */ ([]),
+        subject: null,
+        displayName: null,
+        companyIdFromJwt: null,
+        jwtEmployeeIdClaim: null,
+      }
+    }
     const roles = normalizeJwtRoles([
       ...(Array.isArray(payload?.roles) ? payload.roles : payload?.roles != null ? [payload.roles] : []),
       ...(Array.isArray(payload?.role_ids) ? payload.role_ids : payload?.role_ids != null ? [payload.role_ids] : []),
@@ -51,16 +62,46 @@ export function AuthProvider({ children }) {
       subject,
       displayName: readDisplayName(payload),
       companyIdFromJwt: readPositiveLong(payload, COMPANY_CLAIM),
-      employeeIdFromJwt: readPositiveLong(payload, EMPLOYEE_CLAIM),
+      jwtEmployeeIdClaim: readPositiveLong(payload, EMPLOYEE_CLAIM),
     }
   }, [version])
+
+  useEffect(() => {
+    if (!snapshot.isAuthenticated) {
+      setResolvedEmployeeIdFromMe(null)
+      return
+    }
+    let cancelled = false
+    fetchCurrentEmployee()
+      .then((emp) => {
+        if (cancelled) {
+          return
+        }
+        if (typeof emp?.id === 'number' && emp.id > 0) {
+          setResolvedEmployeeIdFromMe(Math.trunc(emp.id))
+        } else {
+          setResolvedEmployeeIdFromMe(null)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setResolvedEmployeeIdFromMe(null)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [snapshot.isAuthenticated, version])
+
+  const effectiveEmployeeId =
+    resolvedEmployeeIdFromMe != null ? resolvedEmployeeIdFromMe : snapshot.jwtEmployeeIdClaim
 
   useEffect(() => {
     if (!snapshot.isAuthenticated) {
       setResolvedDisplayName(null)
       return
     }
-    if (snapshot.employeeIdFromJwt == null) {
+    if (effectiveEmployeeId == null) {
       setResolvedDisplayName(null)
       return
     }
@@ -70,7 +111,7 @@ export function AuthProvider({ children }) {
     }
 
     let cancelled = false
-    fetchEmployeeDisplayName(snapshot.employeeIdFromJwt)
+    fetchEmployeeDisplayName(effectiveEmployeeId)
       .then((name) => {
         if (!cancelled) {
           setResolvedDisplayName(name)
@@ -84,7 +125,7 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true
     }
-  }, [snapshot.isAuthenticated, snapshot.employeeIdFromJwt, snapshot.displayName])
+  }, [snapshot.isAuthenticated, snapshot.displayName, effectiveEmployeeId])
 
   const setSessionToken = useCallback((accessToken) => {
     try {
@@ -109,16 +150,17 @@ export function AuthProvider({ children }) {
     [snapshot.roles],
   )
 
-  const value = useMemo(
-    () => ({
-      ...snapshot,
+  const value = useMemo(() => {
+    const { jwtEmployeeIdClaim: _jwtEmployeeIdClaim, ...rest } = snapshot
+    return {
+      ...rest,
+      employeeIdFromJwt: effectiveEmployeeId,
       displayName: normalizeDisplayName(resolvedDisplayName) ?? normalizeDisplayName(snapshot.displayName),
       visibleNavItems,
       setSessionToken,
       clearSession,
-    }),
-    [snapshot, resolvedDisplayName, visibleNavItems, setSessionToken, clearSession],
-  )
+    }
+  }, [snapshot, effectiveEmployeeId, resolvedDisplayName, visibleNavItems, setSessionToken, clearSession])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

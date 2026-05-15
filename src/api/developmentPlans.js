@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from './client.js'
+import { apiGet, apiPatch, apiPost } from './client.js'
 import { buildRegistryQuery, normalizePage } from './registry.js'
 
 /**
@@ -21,6 +21,7 @@ import { buildRegistryQuery, normalizePage } from './registry.js'
  * @property {string} [competency_code]
  * @property {boolean} [approved]
  * @property {string | null} [team_lead_comment]
+ * @property {string | null} [employee_progress_notes]
  * @property {number[]} [related_task_ids]
  */
 
@@ -171,5 +172,55 @@ export async function fetchDevelopmentPlansRegistry(filter = {}, options = {}) {
 export function createDevelopmentPlan(employeeId, body) {
   return /** @type {Promise<number>} */ (
     apiPost(`/development-plans/employees/${Math.trunc(employeeId)}`, body)
+  )
+}
+
+/**
+ * @param {number} planId
+ * @param {number} itemId
+ * @param {{ participant_employee_id: number, comment?: string | null }} body
+ * @returns {Promise<DevelopmentPlanCompetencyItemView>}
+ */
+export function teamLeadApproveCompetencyItem(planId, itemId, body) {
+  return /** @type {Promise<DevelopmentPlanCompetencyItemView>} */ (
+    apiPatch(
+      `/development-plans/${Math.trunc(planId)}/competency-items/${Math.trunc(itemId)}/team-lead-approval`,
+      body,
+    )
+  )
+}
+
+/**
+ * @param {number} planId
+ * @param {{ status: string, participant_employee_id?: number | null }} body
+ * @returns {Promise<DevelopmentPlanView>}
+ */
+export function changeDevelopmentPlanStatus(planId, body) {
+  return /** @type {Promise<DevelopmentPlanView>} */ (
+    apiPatch(`/development-plans/${Math.trunc(planId)}/status`, body)
+  )
+}
+
+/**
+ * @param {number} planId
+ * @param {number} taskId
+ * @param {{ participant_employee_id: number, status: string, team_lead_task_score?: number | null }} body
+ * @returns {Promise<DevelopmentPlanTaskView>}
+ */
+export function updateDevelopmentPlanTaskStatus(planId, taskId, body) {
+  return /** @type {Promise<DevelopmentPlanTaskView>} */ (
+    apiPatch(`/development-plans/${Math.trunc(planId)}/tasks/${Math.trunc(taskId)}/status`, body)
+  )
+}
+
+/**
+ * @param {number} planId
+ * @param {number} taskId
+ * @param {{ comment: string }} body
+ * @returns {Promise<{ id: number, task_id: number, comment: string, created_at: string, created_by_employee_id: number }>}
+ */
+export function addDevelopmentPlanTaskComment(planId, taskId, body) {
+  return /** @type {Promise<any>} */ (
+    apiPost(`/development-plans/${Math.trunc(planId)}/tasks/${Math.trunc(taskId)}/comments`, body)
   )
 }

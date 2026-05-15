@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, employeesApi, reviewCyclesApi } from '../api/index.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
 import './pages.css'
 import './EntityZone.css'
 
@@ -14,29 +15,6 @@ const STATUS_LABEL = {
   SCHEDULED: 'Запланирован',
   COMPLETED: 'Завершён',
   CANCELLED: 'Отменён',
-}
-
-/**
- * Дата и время без секунд (дд.мм.гггг, чч:мм).
- * @param {string | null | undefined} iso
- * @returns {string}
- */
-function formatDateTimeNoSeconds(iso) {
-  if (!iso) {
-    return '—'
-  }
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) {
-    return String(iso)
-  }
-  return d.toLocaleString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
 }
 
 /**
@@ -247,13 +225,13 @@ export function ReviewsPage() {
                   <span className="entity-zone__badge">ИПР в основе: {planCount}</span>
                 </div>
                 <p className="entity-zone__card-desc">
-                  Плановая дата: {formatDateTimeNoSeconds(item.scheduled_at)}
+                  Плановая дата: {formatDateTimeRuNoSeconds(item.scheduled_at)}
                 </p>
                 <p className="entity-zone__card-desc entity-zone__task-stats">
-                  Начато: {formatDateTimeNoSeconds(item.started_at)}
+                  Начато: {formatDateTimeRuNoSeconds(item.started_at)}
                 </p>
                 <p className="entity-zone__card-desc entity-zone__task-stats">
-                  Завершено: {formatDateTimeNoSeconds(item.completed_at)}
+                  Завершено: {formatDateTimeRuNoSeconds(item.completed_at)}
                 </p>
               </article>
             )

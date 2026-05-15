@@ -170,7 +170,7 @@ export function DepartmentsPage() {
       ) : null}
 
       {!loading && items && items.length > 0 ? (
-        <div className="entity-zone__grid">
+        <div className="entity-zone__grid entity-zone__grid--idp">
           {items.map((d) => {
             const employeesCount = resolveEmployeeCount(d)
             const directorId = Number(d.director_employee_id)
@@ -182,7 +182,7 @@ export function DepartmentsPage() {
                 : null)
 
             return (
-              <article key={d.id} className="entity-zone__card">
+              <article key={d.id} className="entity-zone__card entity-zone__card--panel">
                 <div className="entity-zone__card-name">{d.name}</div>
                 <div className="entity-zone__card-meta">
                   <span className="entity-zone__badge">Сотрудников: {employeesCount != null ? employeesCount : '—'}</span>
