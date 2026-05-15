@@ -37,7 +37,11 @@ const SAFE_DEFAULT_PATHS = new Set([
   '/reviews',
 ])
 
-const DEPARTMENT_DIRECTOR_PATHS = SAFE_DEFAULT_PATHS
+const DEPARTMENT_DIRECTOR_PATHS = new Set([
+  ...SAFE_DEFAULT_PATHS,
+  '/promotion-decisions',
+  '/reports',
+])
 
 const TEAM_LEAD_PATHS = new Set([
   ...SAFE_DEFAULT_PATHS,

@@ -1,8 +1,8 @@
-import { apiGet, apiPost } from './client.js'
+import { apiGet, apiPatch, apiPost } from './client.js'
 import { buildRegistryQuery, normalizePage } from './registry.js'
 
 /**
- * @typedef {'INTERIM_PROGRESS' | 'FINAL_PROMOTION'} ReviewType
+ * @typedef {'FINAL_PROMOTION'} ReviewType
  */
 
 /**
@@ -18,6 +18,7 @@ import { buildRegistryQuery, normalizePage } from './registry.js'
  * @property {ReviewType} review_type
  * @property {ReviewCycleStatus} status
  * @property {string} scheduled_at
+ * @property {string} created_at
  * @property {string | null} [started_at]
  * @property {string | null} [completed_at]
  * @property {number} initiated_by_employee_id
@@ -115,5 +116,98 @@ export function fetchReviewCycleById(reviewCycleId) {
 export function fetchInterimReviewAssessments(reviewCycleId) {
   return /** @type {Promise<InterimReviewAssessmentView[]>} */ (
     apiGet(`/review-cycles/${Math.trunc(reviewCycleId)}/assessments`)
+  )
+}
+
+/**
+ * @typedef {object} FinalPromotionReviewScheduleRequest
+ * @property {number} director_employee_id
+ * @property {string} scheduled_at ISO-8601 local date-time
+ */
+
+/**
+ * @typedef {object} FinalPromotionReviewScheduleView
+ * @property {number} review_cycle_id
+ * @property {number | null} [basis_plan_id]
+ * @property {number[]} considered_development_plan_ids
+ * @property {boolean} policy_compliant
+ * @property {string[]} policy_advisories
+ */
+
+/**
+ * @param {number} employeeId
+ * @param {FinalPromotionReviewScheduleRequest} body
+ * @returns {Promise<FinalPromotionReviewScheduleView>}
+ */
+export function scheduleFinalPromotionReview(employeeId, body) {
+  return /** @type {Promise<FinalPromotionReviewScheduleView>} */ (
+    apiPost(`/review-cycles/employees/${Math.trunc(employeeId)}/final-promotion`, body)
+  )
+}
+
+/**
+ * @typedef {object} FinalPromotionDecisionRequest
+ * @property {number} director_employee_id
+ * @property {'APPROVED' | 'REJECTED'} decision
+ * @property {number | null | undefined} [target_grade_id]
+ * @property {string} rationale
+ * @property {string | null | undefined} [improvement_plan_summary]
+ */
+
+/**
+ * @typedef {object} FinalPromotionDecisionResultView
+ * @property {number} promotion_decision_id
+ * @property {number | null} [weighted_score_advisory]
+ * @property {boolean} policy_compliant
+ * @property {string[]} policy_advisories
+ */
+
+/**
+ * @param {number} reviewCycleId
+ * @param {FinalPromotionDecisionRequest} body
+ * @returns {Promise<FinalPromotionDecisionResultView>}
+ */
+export function makeFinalPromotionDecision(reviewCycleId, body) {
+  return /** @type {Promise<FinalPromotionDecisionResultView>} */ (
+    apiPost(`/review-cycles/${Math.trunc(reviewCycleId)}/promotion-decision`, body)
+  )
+}
+
+/**
+ * @typedef {object} PromotionInterviewScheduleHistoryView
+ * @property {number} history_id
+ * @property {string} previous_scheduled_at
+ * @property {string} new_scheduled_at
+ * @property {number} rescheduled_by_employee_id
+ * @property {string} rescheduled_by_employee_name
+ * @property {string} rescheduled_at
+ * @property {string | null} [comment]
+ */
+
+/**
+ * @typedef {object} ReviewCycleRescheduleRequest
+ * @property {number} rescheduled_by_employee_id
+ * @property {string} scheduled_at ISO-8601 local date-time
+ * @property {string | null | undefined} [comment]
+ */
+
+/**
+ * @param {number} reviewCycleId
+ * @param {ReviewCycleRescheduleRequest} body
+ * @returns {Promise<ReviewCycleView>}
+ */
+export function rescheduleReviewCycle(reviewCycleId, body) {
+  return /** @type {Promise<ReviewCycleView>} */ (
+    apiPatch(`/review-cycles/${Math.trunc(reviewCycleId)}/reschedule`, body)
+  )
+}
+
+/**
+ * @param {number} reviewCycleId
+ * @returns {Promise<PromotionInterviewScheduleHistoryView[]>}
+ */
+export function fetchPromotionInterviewScheduleHistory(reviewCycleId) {
+  return /** @type {Promise<PromotionInterviewScheduleHistoryView[]>} */ (
+    apiGet(`/review-cycles/${Math.trunc(reviewCycleId)}/schedule-history`)
   )
 }

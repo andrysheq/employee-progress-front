@@ -16,5 +16,5 @@
 
   --header-height: 56px;
   --page-padding-x: clamp(16px, 4vw, 48px);
-  --content-max-width: 1200px;
+  --content-max-width: 1680px;
 }

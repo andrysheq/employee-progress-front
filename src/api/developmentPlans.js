@@ -26,6 +26,15 @@ import { buildRegistryQuery, normalizePage } from './registry.js'
  */
 
 /**
+ * @typedef {object} DevelopmentPlanReviewView
+ * @property {number} id
+ * @property {number} reviewer_employee_id
+ * @property {'EMPLOYEE' | 'MANAGER' | 'TEAM_LEAD' | string} reviewer_role
+ * @property {'PENDING' | 'APPROVED' | string} status
+ * @property {string | null} [approved_at]
+ */
+
+/**
  * @typedef {object} DevelopmentPlanView
  * @property {number} id
  * @property {number} employee_id
@@ -40,6 +49,7 @@ import { buildRegistryQuery, normalizePage } from './registry.js'
  * @property {number | null} [team_lead_plan_score_hundredths]
  * @property {DevelopmentPlanTaskView[]} tasks
  * @property {DevelopmentPlanCompetencyItemView[]} [competency_items]
+ * @property {DevelopmentPlanReviewView[]} [reviews]
  */
 
 /**
@@ -114,7 +124,7 @@ export function fetchTaskAttachments(planId, taskId) {
  * @property {number | null | undefined} [manager_id]
  * @property {number | null | undefined} [team_lead_id]
  * @property {number | null | undefined} [target_grade_id]
- * @property {'DRAFT' | 'ACTIVE' | 'ARCHIVED' | null | undefined} [status]
+ * @property {'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'CLOSED' | null | undefined} [status]
  * @property {string | null | undefined} [period_start_from]
  * @property {string | null | undefined} [period_end_to]
  * @property {string | null | undefined} [employee_title_like]
@@ -210,6 +220,17 @@ export function changeDevelopmentPlanStatus(planId, body) {
 export function updateDevelopmentPlanTaskStatus(planId, taskId, body) {
   return /** @type {Promise<DevelopmentPlanTaskView>} */ (
     apiPatch(`/development-plans/${Math.trunc(planId)}/tasks/${Math.trunc(taskId)}/status`, body)
+  )
+}
+
+/**
+ * @param {number} planId
+ * @param {DevelopmentPlanTaskCreateRequest} body
+ * @returns {Promise<DevelopmentPlanTaskView>}
+ */
+export function createDevelopmentPlanTask(planId, body) {
+  return /** @type {Promise<DevelopmentPlanTaskView>} */ (
+    apiPost(`/development-plans/${Math.trunc(planId)}/tasks`, body)
   )
 }
 

@@ -14,7 +14,7 @@ export const mainNavItems = [
   { to: "/employees", label: "Сотрудники" },
   { to: "/policies", label: "Политики" },
   { to: "/development-plans", label: "ИПР" },
-  { to: "/reviews", label: "Ревью" },
+  { to: "/reviews", label: "Собеседования" },
   { to: "/promotion-decisions", label: "Решения" },
   { to: "/reports", label: "Отчёты" },
 ]

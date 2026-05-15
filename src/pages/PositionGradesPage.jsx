@@ -77,6 +77,22 @@ export function PositionGradesPage() {
   )
   const [gradeToDeactivate, setGradeToDeactivate] = useState(/** @type {number | null} */ (null))
 
+  const [competencies, setCompetencies] = useState(
+    /** @type {import('../api/gradeModel.js').CompetencyView[]} */ ([]),
+  )
+  const [competencyLevels, setCompetencyLevels] = useState(
+    /** @type {import('../api/gradeModel.js').RefCompetencyLevelView[]} */ ([]),
+  )
+  const [dictionariesError, setDictionariesError] = useState(/** @type {string | null} */ (null))
+
+  const [criterionForm, setCriterionForm] = useState(
+    /** @type {{ gradeId: number, mode: 'create' | 'edit', criterionId?: number, competencyId: string, requiredLevelId: string } | null} */ (null),
+  )
+  const [criterionError, setCriterionError] = useState(/** @type {string | null} */ (null))
+  const [criterionToDelete, setCriterionToDelete] = useState(
+    /** @type {{ id: number, label: string } | null} */ (null),
+  )
+
   const load = useCallback(async () => {
     if (companyId == null || positionId == null) {
       setMatrix(null)
@@ -106,6 +122,61 @@ export function PositionGradesPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (companyId == null || positionId == null) {
+      setCompetencies([])
+      setCompetencyLevels([])
+      setDictionariesError(null)
+      return
+    }
+    let cancelled = false
+    async function run() {
+      setDictionariesError(null)
+      try {
+        const [cList, lList] = await Promise.all([
+          gradeModelApi.fetchCompetencies(),
+          gradeModelApi.fetchCompetencyLevels(true),
+        ])
+        if (!cancelled) {
+          const levelsRaw = Array.isArray(lList) ? lList : []
+          levelsRaw.sort((a, b) => (a.order_num ?? 0) - (b.order_num ?? 0))
+          setCompetencies(Array.isArray(cList) ? cList : [])
+          setCompetencyLevels(levelsRaw)
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setCompetencies([])
+          setCompetencyLevels([])
+          if (e instanceof ApiError) {
+            setDictionariesError(e.message)
+          } else if (e instanceof Error) {
+            setDictionariesError(e.message)
+          } else {
+            setDictionariesError('Не удалось загрузить компетенции и уровни')
+          }
+        }
+      }
+    }
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [companyId, positionId])
+
+  useEffect(() => {
+    if (!criterionForm) {
+      return
+    }
+    const onKeyDown = (ev) => {
+      if (ev.key === 'Escape' && !submitting) {
+        setCriterionForm(null)
+        setCriterionError(null)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [criterionForm, submitting])
 
   useEffect(() => {
     if (!gradeForm) {
@@ -281,6 +352,107 @@ export function PositionGradesPage() {
     setActionError(null)
   }
 
+  function closeCriterionModal() {
+    if (submitting) {
+      return
+    }
+    setCriterionForm(null)
+    setCriterionError(null)
+  }
+
+  /** @param {number} gradeId */
+  function openCreateCriterion(gradeId) {
+    setCriterionError(null)
+    setCriterionForm({
+      gradeId,
+      mode: 'create',
+      competencyId: '',
+      requiredLevelId: '',
+    })
+  }
+
+  /**
+   * @param {number} gradeId
+   * @param {import('../api/gradeModel.js').GradeCriterionView} c
+   */
+  function openEditCriterion(gradeId, c) {
+    setCriterionError(null)
+    setCriterionForm({
+      gradeId,
+      mode: 'edit',
+      criterionId: c.id,
+      competencyId: String(c.competency_id),
+      requiredLevelId: String(c.required_level_id),
+    })
+  }
+
+  async function handleSaveCriterion() {
+    if (!criterionForm) {
+      return
+    }
+    const competency_id = Number(criterionForm.competencyId)
+    const required_level_id = Number(criterionForm.requiredLevelId)
+    if (!Number.isInteger(competency_id) || competency_id <= 0) {
+      setCriterionError('Выберите компетенцию.')
+      return
+    }
+    if (!Number.isInteger(required_level_id) || required_level_id <= 0) {
+      setCriterionError('Выберите требуемый уровень.')
+      return
+    }
+
+    setSubmitting(true)
+    setCriterionError(null)
+    try {
+      if (criterionForm.mode === 'create') {
+        await gradeModelApi.createGradeCriterion(criterionForm.gradeId, {
+          competency_id,
+          required_level_id,
+        })
+      } else if (criterionForm.criterionId != null) {
+        await gradeModelApi.updateGradeCriterion(criterionForm.criterionId, {
+          competency_id,
+          required_level_id,
+        })
+      }
+      setCriterionForm(null)
+      await load()
+    } catch (e) {
+      if (e instanceof ApiError) {
+        setCriterionError(e.message)
+      } else if (e instanceof Error) {
+        setCriterionError(e.message)
+      } else {
+        setCriterionError('Не удалось сохранить требование по компетенции')
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  /** @param {number} criterionId */
+  async function handleConfirmDeleteCriterion(criterionId) {
+    setSubmitting(true)
+    setActionError(null)
+    try {
+      await gradeModelApi.deleteGradeCriterion(criterionId)
+      setCriterionToDelete(null)
+      await load()
+    } catch (e) {
+      if (e instanceof ApiError) {
+        setActionError(e.message)
+      } else if (e instanceof Error) {
+        setActionError(e.message)
+      } else {
+        setActionError('Не удалось удалить требование')
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const dictReady = competencies.length > 0 && competencyLevels.length > 0 && dictionariesError == null
+
   return (
     <article className="page">
       <ol className="page__breadcrumbs">
@@ -340,13 +512,19 @@ export function PositionGradesPage() {
         ) : null}
       </div>
 
+      {dictionariesError && position ? (
+        <div className="entity-zone__error" role="alert">
+          {dictionariesError} Управление требованиями по компетенциям недоступно, пока не загрузятся справочники.
+        </div>
+      ) : null}
+
       {error ? (
         <div className="entity-zone__error" role="alert">
           {error}
         </div>
       ) : null}
 
-      {actionError && !gradeForm ? (
+      {actionError && !gradeForm && !criterionForm ? (
         <div className="entity-zone__error" role="alert">
           {actionError}
         </div>
@@ -373,38 +551,117 @@ export function PositionGradesPage() {
             ) : (
               grades.map((g) => {
                 const salary = gradeSalaryLine(g)
+                const criteriaRaw = Array.isArray(g.criteria) ? [...g.criteria] : []
+                criteriaRaw.sort((a, b) =>
+                  (a.competency_name ?? '').localeCompare(b.competency_name ?? '', undefined, {
+                    sensitivity: 'base',
+                  }),
+                )
+
                 return (
-                  <div
-                    key={g.id}
-                    className={`entity-zone__grades-row${canManage ? ' entity-zone__grades-row--manage' : ''}`}
-                  >
-                    <span>{g.name || '?'}</span>
-                    <span>{salary ?? '?'}</span>
-                    <span>{g.level_order ?? '?'}</span>
-                    {canManage ? (
-                      <span className="entity-zone__icon-actions">
-                        <button
-                          type="button"
-                          className="entity-zone__icon-button"
-                          title="Редактировать грейд"
-                          aria-label="Редактировать грейд"
-                          onClick={() => openEditGrade(g)}
-                          disabled={submitting}
-                        >
-                          {'\u270E'}
-                        </button>
-                        <button
-                          type="button"
-                          className="entity-zone__icon-button entity-zone__icon-button--danger"
-                          title="Деактивировать грейд"
-                          aria-label="Деактивировать грейд"
-                          onClick={() => setGradeToDeactivate(g.id)}
-                          disabled={submitting || !g.is_active}
-                        >
-                          {'\u2212'}
-                        </button>
-                      </span>
-                    ) : null}
+                  <div key={g.id} className="entity-zone__grade-block">
+                    <div
+                      className={`entity-zone__grades-row${canManage ? ' entity-zone__grades-row--manage' : ''}`}
+                    >
+                      <span>{g.name || '?'}</span>
+                      <span>{salary ?? '?'}</span>
+                      <span>{g.level_order ?? '?'}</span>
+                      {canManage ? (
+                        <span className="entity-zone__icon-actions">
+                          <button
+                            type="button"
+                            className="entity-zone__icon-button"
+                            title="Редактировать грейд"
+                            aria-label="Редактировать грейд"
+                            onClick={() => openEditGrade(g)}
+                            disabled={submitting}
+                          >
+                            {'\u270E'}
+                          </button>
+                          <button
+                            type="button"
+                            className="entity-zone__icon-button entity-zone__icon-button--danger"
+                            title="Деактивировать грейд"
+                            aria-label="Деактивировать грейд"
+                            onClick={() => setGradeToDeactivate(g.id)}
+                            disabled={submitting || !g.is_active}
+                          >
+                            {'\u2212'}
+                          </button>
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className="entity-zone__grade-criteria">
+                      <div className="entity-zone__grade-criteria-title">Требования по компетенциям</div>
+                      {criteriaRaw.length === 0 ? (
+                        <p className="entity-zone__muted" style={{ margin: '0.15rem 0 0' }}>
+                          Для этого грейда пока не заданы компетенции.
+                        </p>
+                      ) : (
+                        criteriaRaw.map((c) => (
+                          <div key={c.id} className="entity-zone__criterion-row">
+                            <span>
+                              <strong>{c.competency_name ?? '?'}</strong>
+                              {' — '}
+                              {c.required_level_name ?? '?'}
+                            </span>
+                            {canManage ? (
+                              <span className="entity-zone__icon-actions">
+                                <button
+                                  type="button"
+                                  className="entity-zone__icon-button"
+                                  title="Изменить требование"
+                                  aria-label="Изменить требование по компетенции"
+                                  onClick={() => openEditCriterion(g.id, c)}
+                                  disabled={submitting || !dictReady}
+                                >
+                                  {'\u270E'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="entity-zone__icon-button entity-zone__icon-button--danger"
+                                  title="Удалить требование"
+                                  aria-label="Удалить требование по компетенции"
+                                  onClick={() =>
+                                    setCriterionToDelete({
+                                      id: c.id,
+                                      label: `${c.competency_name ?? '?'} — ${c.required_level_name ?? '?'}`,
+                                    })
+                                  }
+                                  disabled={submitting || !dictReady}
+                                >
+                                  {'\u2212'}
+                                </button>
+                              </span>
+                            ) : null}
+                          </div>
+                        ))
+                      )}
+                      {canManage ? (
+                        <div style={{ marginTop: '0.45rem' }}>
+                          <button
+                            type="button"
+                            className="entity-zone__button"
+                            onClick={() => openCreateCriterion(g.id)}
+                            disabled={submitting || !dictReady}
+                          >
+                            + Добавить компетенцию
+                          </button>
+                          {!dictReady && dictionariesError == null ? (
+                            <span className="entity-zone__hint" style={{ display: 'block', marginTop: '0.35rem' }}>
+                              Дождитесь загрузки справочников компетенций и уровней или задайте их на странице «Матрица
+                              грейдов».
+                            </span>
+                          ) : null}
+                          {!dictReady && dictionariesError != null ? (
+                            <span className="entity-zone__hint" style={{ display: 'block', marginTop: '0.35rem' }}>
+                              Исправьте ошибку загрузки справочников выше.
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 )
               })
@@ -517,6 +774,101 @@ export function PositionGradesPage() {
         </div>
       ) : null}
 
+      {criterionForm ? (
+        <div className="entity-zone__modal-backdrop" role="presentation" onClick={closeCriterionModal}>
+          <section
+            className="entity-zone__modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={
+              criterionForm.mode === 'create'
+                ? 'Добавление требования по компетенции'
+                : 'Редактирование требования по компетенции'
+            }
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <div className="entity-zone__modal-head">
+              <h3 className="entity-zone__modal-title">
+                {criterionForm.mode === 'create'
+                  ? 'Компетенция для грейда'
+                  : 'Изменить требование по компетенции'}
+              </h3>
+              <button
+                type="button"
+                className="entity-zone__icon-button"
+                onClick={closeCriterionModal}
+                aria-label="Закрыть"
+                disabled={submitting}
+              >
+                {'\u00D7'}
+              </button>
+            </div>
+
+            <p className="entity-zone__muted" style={{ margin: '0 0 0.65rem' }}>
+              Грейд:{' '}
+              <strong>{grades.find((gr) => gr.id === criterionForm.gradeId)?.name ?? '—'}</strong>
+            </p>
+
+            {criterionError ? (
+              <div className="entity-zone__error" role="alert">
+                {criterionError}
+              </div>
+            ) : null}
+
+            <div className="entity-zone__filters entity-zone__filters--row">
+              <label className="entity-zone__field entity-zone__field--wide">
+                <span className="entity-zone__field-label">Компетенция</span>
+                <select
+                  className="entity-zone__select"
+                  value={criterionForm.competencyId}
+                  onChange={(ev) =>
+                    setCriterionForm((f) => (f ? { ...f, competencyId: ev.target.value } : f))
+                  }
+                >
+                  <option value="">Выберите компетенцию</option>
+                  {competencies.map((co) => (
+                    <option key={co.id} value={String(co.id)}>
+                      {co.code ? `${co.code} — ${co.name}` : co.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="entity-zone__field entity-zone__field--wide">
+                <span className="entity-zone__field-label">Требуемый уровень</span>
+                <select
+                  className="entity-zone__select"
+                  value={criterionForm.requiredLevelId}
+                  onChange={(ev) =>
+                    setCriterionForm((f) => (f ? { ...f, requiredLevelId: ev.target.value } : f))
+                  }
+                >
+                  <option value="">Выберите уровень</option>
+                  {competencyLevels.map((lv) => (
+                    <option key={lv.id} value={String(lv.id)}>
+                      {lv.code ? `${lv.code} — ${lv.name}` : lv.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="entity-zone__actions">
+              <button
+                type="button"
+                className="entity-zone__button entity-zone__button--primary"
+                onClick={() => void handleSaveCriterion()}
+                disabled={submitting}
+              >
+                Сохранить
+              </button>
+              <button type="button" className="entity-zone__button" onClick={closeCriterionModal} disabled={submitting}>
+                Отмена
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       <ConfirmDialog
         open={gradeToDeactivate != null}
         title="Подтвердите действие"
@@ -529,6 +881,26 @@ export function PositionGradesPage() {
         onConfirm={() => {
           if (gradeToDeactivate != null) {
             void handleDeactivateGrade(gradeToDeactivate)
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={criterionToDelete != null}
+        title="Подтвердите действие"
+        message={
+          criterionToDelete != null
+            ? `Удалить требование по компетенции «${criterionToDelete.label}»?`
+            : ''
+        }
+        confirmLabel="Удалить"
+        cancelLabel="Отменить"
+        destructive
+        busy={submitting}
+        onCancel={() => (!submitting ? setCriterionToDelete(null) : undefined)}
+        onConfirm={() => {
+          if (criterionToDelete != null) {
+            void handleConfirmDeleteCriterion(criterionToDelete.id)
           }
         }}
       />

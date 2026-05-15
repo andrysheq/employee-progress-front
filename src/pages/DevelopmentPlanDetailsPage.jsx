@@ -4,13 +4,16 @@ import { ApiError, developmentPlansApi, employeesApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
 import { hasTeamLeadRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { DevelopmentPlanAddTaskForm } from '../components/DevelopmentPlanAddTaskForm.jsx'
+import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
 import './pages.css'
 import './EntityZone.css'
 
 const PLAN_STATUS_LABEL = {
   DRAFT: 'Черновик',
   ACTIVE: 'Активен',
-  ARCHIVED: 'Архив',
+  COMPLETED: 'Завершён',
+  CLOSED: 'Закрыт',
 }
 
 const TASK_STATUS_LABEL = {
@@ -29,6 +32,17 @@ const TASK_PRIORITY_LABEL = {
   HIGH: 'Высокий',
   MIDDLE: 'Средний',
   LOW: 'Низкий',
+}
+
+const REVIEW_ROLE_LABEL = {
+  EMPLOYEE: 'Сотрудник',
+  MANAGER: 'Менеджер',
+  TEAM_LEAD: 'Тимлид',
+}
+
+const REVIEW_STATUS_LABEL = {
+  PENDING: 'Ожидает',
+  APPROVED: 'Согласовано',
 }
 
 function formatDate(v) {
@@ -54,7 +68,7 @@ function taskStatusChipClass(status) {
 function planStatusChipClass(status) {
   const s = String(status ?? '').toUpperCase()
   if (s === 'ACTIVE') return 'entity-zone__idp-chip entity-zone__idp-chip--status-progress'
-  if (s === 'ARCHIVED') return 'entity-zone__idp-chip entity-zone__idp-chip--status-done'
+  if (s === 'COMPLETED' || s === 'CLOSED') return 'entity-zone__idp-chip entity-zone__idp-chip--status-done'
   return 'entity-zone__idp-chip entity-zone__idp-chip--status-planned'
 }
 
@@ -130,8 +144,12 @@ export function DevelopmentPlanDetailsPage() {
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [archiveBusy, setArchiveBusy] = useState(false)
-  const [archiveError, setArchiveError] = useState(null)
+  const [completeBusy, setCompleteBusy] = useState(false)
+  const [completeError, setCompleteError] = useState(null)
+  const [closeBusy, setCloseBusy] = useState(false)
+  const [closeError, setCloseError] = useState(null)
+  const [approveBusy, setApproveBusy] = useState(false)
+  const [approveError, setApproveError] = useState(null)
 
   const loadAll = useCallback(async () => {
     if (!planId) return
@@ -155,7 +173,8 @@ export function DevelopmentPlanDetailsPage() {
       if (!planId) return
       setLoading(true)
       setError(null)
-      setArchiveError(null)
+      setCompleteError(null)
+      setCloseError(null)
       try {
         await loadAll()
       } catch (e) {
@@ -189,8 +208,60 @@ export function DevelopmentPlanDetailsPage() {
     employeeIdFromJwt != null &&
     Number(plan.team_lead_id) === Number(employeeIdFromJwt)
 
-  const planActiveAndApproved =
-    plan != null && String(plan.status ?? '').toUpperCase() === 'ACTIVE' && Boolean(plan.approved_at)
+  const planIsActive = plan != null && planStatusKey === 'ACTIVE'
+  const planIsDraft = plan != null && planStatusKey === 'DRAFT'
+  const planIsTerminal =
+    plan != null && (planStatusKey === 'COMPLETED' || planStatusKey === 'CLOSED')
+  const canTeamLeadAddTasks = isTeamLeadForPlan && (planIsActive || planIsDraft)
+  const canTeamLeadClosePlan = isTeamLeadForPlan && (planIsActive || planIsDraft)
+
+  const reviews = useMemo(() => {
+    return Array.isArray(plan?.reviews) ? plan.reviews : []
+  }, [plan])
+
+  const myPendingReview = useMemo(() => {
+    if (employeeIdFromJwt == null) {
+      return null
+    }
+    return (
+      reviews.find(
+        (r) =>
+          Number(r.reviewer_employee_id) === Number(employeeIdFromJwt) &&
+          String(r.status ?? '').toUpperCase() === 'PENDING',
+      ) ?? null
+    )
+  }, [reviews, employeeIdFromJwt])
+
+  const showApprovalSection = plan != null && !planIsActive && !planIsTerminal
+
+  const planReadyForComplete = useMemo(() => {
+    if (!planIsActive || plan == null) {
+      return false
+    }
+    const tasks = Array.isArray(plan.tasks) ? plan.tasks : []
+    if (tasks.length === 0) {
+      return false
+    }
+    const allTasksDoneWithScore = tasks.every((task) => {
+      const st = String(task.status ?? '').toUpperCase()
+      if (st !== 'DONE') {
+        return false
+      }
+      const score = task.team_lead_task_score
+      if (score == null || !Number.isFinite(Number(score))) {
+        return false
+      }
+      const n = Number(score)
+      return n >= 1 && n <= 10
+    })
+    if (!allTasksDoneWithScore) {
+      return false
+    }
+    if (competencies.length === 0) {
+      return true
+    }
+    return competencies.every((c) => c.approved === true)
+  }, [plan, planIsActive, competencies])
 
   const reloadCompetenciesOnly = useCallback(async () => {
     if (!planId) return
@@ -226,42 +297,208 @@ export function DevelopmentPlanDetailsPage() {
             <span className={planStatusChipClass(plan.status)}>{planStatusLabel}</span>
           </header>
 
-          {isTeamLeadForPlan && planActiveAndApproved ? (
+          {planIsActive ? (
+            <p className="entity-zone__idp-muted" style={{ marginTop: '0.75rem' }}>
+              ИПР активен{plan.approved_at ? ` (согласован: ${formatDate(plan.approved_at)})` : ''}. Работа с задачами и
+              прогрессом доступна участникам.
+            </p>
+          ) : null}
+
+          {showApprovalSection ? (
+            <section className="entity-zone__idp-section" aria-labelledby="idp-approval-heading">
+              <h2 id="idp-approval-heading" className="entity-zone__idp-section-title">
+                Согласование ИПР
+              </h2>
+              <p className="entity-zone__idp-muted">
+                Для активации плана необходимо подтверждение сотрудника, менеджера и тимлида. После всех
+                согласований ИПР станет активным, и откроется работа с задачами.
+              </p>
+              <div className="entity-zone__idp-cards" style={{ marginTop: '0.75rem' }}>
+                {reviews.length === 0 ? (
+                  <p className="entity-zone__idp-muted">Данные о согласованиях пока недоступны.</p>
+                ) : (
+                  reviews.map((review) => {
+                    const roleKey = String(review.reviewer_role ?? '').toUpperCase()
+                    const roleLabel =
+                      REVIEW_ROLE_LABEL[/** @type {keyof typeof REVIEW_ROLE_LABEL} */ (roleKey)] ??
+                      review.reviewer_role ??
+                      '—'
+                    const stKey = String(review.status ?? '').toUpperCase()
+                    const stLabel =
+                      REVIEW_STATUS_LABEL[/** @type {keyof typeof REVIEW_STATUS_LABEL} */ (stKey)] ??
+                      review.status ??
+                      '—'
+                    const reviewerName =
+                      employeeNameById.get(review.reviewer_employee_id) ??
+                      `Сотрудник #${review.reviewer_employee_id}`
+                    const isApproved = stKey === 'APPROVED'
+                    return (
+                      <article key={review.id} className="entity-zone__idp-card">
+                        <div className="entity-zone__idp-card-head">
+                          <h3 className="entity-zone__idp-card-title">{roleLabel}</h3>
+                          <span
+                            className={
+                              isApproved
+                                ? 'entity-zone__idp-chip entity-zone__idp-chip--ok'
+                                : 'entity-zone__idp-chip entity-zone__idp-chip--pending'
+                            }
+                          >
+                            {stLabel}
+                          </span>
+                        </div>
+                        <p className="entity-zone__idp-muted" style={{ marginTop: '0.35rem' }}>
+                          {reviewerName}
+                        </p>
+                        {review.approved_at ? (
+                          <p className="entity-zone__idp-muted" style={{ marginTop: '0.25rem' }}>
+                            {formatDateTimeRuNoSeconds(review.approved_at)}
+                          </p>
+                        ) : null}
+                      </article>
+                    )
+                  })
+                )}
+              </div>
+              {myPendingReview != null && employeeIdFromJwt != null ? (
+                <div style={{ marginTop: '1rem' }}>
+                  <p className="entity-zone__idp-muted" style={{ marginBottom: '0.5rem' }}>
+                    Вы — участник согласования. Подтвердите ИПР, чтобы зафиксировать своё согласие.
+                  </p>
+                  {approveError ? (
+                    <div className="entity-zone__error" role="alert" style={{ marginBottom: '0.5rem' }}>
+                      {approveError}
+                    </div>
+                  ) : null}
+                  <div className="entity-zone__actions">
+                    <button
+                      type="button"
+                      className="entity-zone__button entity-zone__button--primary"
+                      disabled={approveBusy}
+                      onClick={async () => {
+                        if (!plan?.id) return
+                        setApproveBusy(true)
+                        setApproveError(null)
+                        try {
+                          const updated = await developmentPlansApi.changeDevelopmentPlanStatus(plan.id, {
+                            status: 'ACTIVE',
+                            participant_employee_id: employeeIdFromJwt,
+                          })
+                          setPlan(updated)
+                          await loadAll()
+                        } catch (e) {
+                          if (e instanceof ApiError) setApproveError(e.message)
+                          else if (e instanceof Error) setApproveError(e.message)
+                          else setApproveError('Не удалось согласовать ИПР')
+                        } finally {
+                          setApproveBusy(false)
+                        }
+                      }}
+                    >
+                      Согласовать ИПР
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              {myPendingReview == null && !planIsActive && reviews.length > 0 ? (
+                <p className="entity-zone__idp-muted" style={{ marginTop: '1rem' }}>
+                  {reviews.every((r) => String(r.status ?? '').toUpperCase() === 'APPROVED') ? (
+                    <>
+                      Все участники согласовали ИПР. Обновите страницу — план будет активирован автоматически.
+                    </>
+                  ) : (
+                    <>
+                      Ваше согласование уже зафиксировано или вы не являетесь участником этого ИПР. Ожидайте
+                      подтверждения остальных участников.
+                    </>
+                  )}
+                </p>
+              ) : null}
+            </section>
+          ) : null}
+
+          {isTeamLeadForPlan && (planIsActive || planIsDraft) ? (
             <section className="entity-zone__idp-section" aria-labelledby="idp-tl-actions-heading">
               <h2 id="idp-tl-actions-heading" className="entity-zone__idp-section-title">
                 Действия тимлида
               </h2>
-              <p className="entity-zone__idp-muted">
-                Архивация доступна, когда все задачи завершены с оценкой тимлида (1–10) и все компетенции подтверждены.
-              </p>
-              {archiveError ? (
+              {planIsActive ? (
+                <p className="entity-zone__idp-muted">
+                  Завершение доступно, когда все задачи выполнены с оценкой тимлида (1–10) и все компетенции
+                  подтверждены. Закрытие ИПР — отмена плана без завершения работ.
+                </p>
+              ) : (
+                <p className="entity-zone__idp-muted">
+                  Завершить черновик можно без проверки задач. Закрытие ИПР — отмена черновика.
+                </p>
+              )}
+              {completeError ? (
                 <div className="entity-zone__error" role="alert" style={{ marginTop: '0.5rem' }}>
-                  {archiveError}
+                  {completeError}
                 </div>
               ) : null}
-              <div className="entity-zone__actions" style={{ marginTop: '0.5rem' }}>
-                <button
-                  type="button"
-                  className="entity-zone__button entity-zone__button--primary"
-                  disabled={archiveBusy}
-                  onClick={async () => {
-                    if (!plan?.id) return
-                    setArchiveBusy(true)
-                    setArchiveError(null)
-                    try {
-                      await developmentPlansApi.changeDevelopmentPlanStatus(plan.id, { status: 'ARCHIVED' })
-                      await loadAll()
-                    } catch (e) {
-                      if (e instanceof ApiError) setArchiveError(e.message)
-                      else if (e instanceof Error) setArchiveError(e.message)
-                      else setArchiveError('Не удалось архивировать ИПР')
-                    } finally {
-                      setArchiveBusy(false)
-                    }
-                  }}
-                >
-                  Архивировать ИПР
-                </button>
+              {closeError ? (
+                <div className="entity-zone__error" role="alert" style={{ marginTop: '0.5rem' }}>
+                  {closeError}
+                </div>
+              ) : null}
+              <div className="entity-zone__actions entity-zone__actions--idp-tl" style={{ marginTop: '0.5rem' }}>
+                {(planIsDraft || (planIsActive && planReadyForComplete)) ? (
+                  <button
+                    type="button"
+                    className="entity-zone__button entity-zone__button--primary"
+                    disabled={completeBusy || closeBusy}
+                    onClick={async () => {
+                      if (!plan?.id) return
+                      if (
+                        planIsDraft &&
+                        !window.confirm('Завершить ИПР в статусе черновика без согласования и проверки задач?')
+                      ) {
+                        return
+                      }
+                      setCompleteBusy(true)
+                      setCompleteError(null)
+                      try {
+                        await developmentPlansApi.changeDevelopmentPlanStatus(plan.id, { status: 'COMPLETED' })
+                        await loadAll()
+                      } catch (e) {
+                        if (e instanceof ApiError) setCompleteError(e.message)
+                        else if (e instanceof Error) setCompleteError(e.message)
+                        else setCompleteError('Не удалось завершить ИПР')
+                      } finally {
+                        setCompleteBusy(false)
+                      }
+                    }}
+                  >
+                    Завершить ИПР
+                  </button>
+                ) : null}
+                {canTeamLeadClosePlan ? (
+                  <button
+                    type="button"
+                    className="entity-zone__button entity-zone__button--end entity-zone__button--accent-on-hover"
+                    disabled={closeBusy || completeBusy}
+                    onClick={async () => {
+                      if (!plan?.id) return
+                      if (!window.confirm('Закрыть (отменить) ИПР? Дальнейшая работа по плану будет недоступна.')) {
+                        return
+                      }
+                      setCloseBusy(true)
+                      setCloseError(null)
+                      try {
+                        await developmentPlansApi.changeDevelopmentPlanStatus(plan.id, { status: 'CLOSED' })
+                        await loadAll()
+                      } catch (e) {
+                        if (e instanceof ApiError) setCloseError(e.message)
+                        else if (e instanceof Error) setCloseError(e.message)
+                        else setCloseError('Не удалось закрыть ИПР')
+                      } finally {
+                        setCloseBusy(false)
+                      }
+                    }}
+                  >
+                    Закрыть ИПР
+                  </button>
+                ) : null}
               </div>
             </section>
           ) : null}
@@ -309,6 +546,13 @@ export function DevelopmentPlanDetailsPage() {
                 })
               )}
             </div>
+            {canTeamLeadAddTasks && plan?.id ? (
+              <DevelopmentPlanAddTaskForm
+                planId={plan.id}
+                defaultPlannedStartDate={plan.period_start}
+                onCreated={loadAll}
+              />
+            ) : null}
           </section>
 
           <section className="entity-zone__idp-section" aria-labelledby="idp-comp-heading">
@@ -349,7 +593,7 @@ export function DevelopmentPlanDetailsPage() {
                       Связанные задачи:{' '}
                       {c.related_task_ids?.length ? c.related_task_ids.join(', ') : 'не найдены'}
                     </p>
-                    {isTeamLeadForPlan && planActiveAndApproved && employeeIdFromJwt != null ? (
+                    {isTeamLeadForPlan && planIsActive && employeeIdFromJwt != null ? (
                       <CompetencyTeamLeadApproveForm
                         planId={plan.id}
                         item={c}

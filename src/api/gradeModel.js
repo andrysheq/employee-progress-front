@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut, apiPatch } from './client.js'
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from './client.js'
 import { buildRegistryQuery, normalizePage } from './registry.js'
 
 /**
@@ -8,6 +8,35 @@ import { buildRegistryQuery, normalizePage } from './registry.js'
  * @property {string} code
  * @property {string} name
  * @property {string} [description]
+ * @property {boolean} is_active
+ */
+
+/**
+ * @typedef {object} GradeCriterionView
+ * @property {number} id
+ * @property {number} grade_id
+ * @property {number} competency_id
+ * @property {string} competency_code
+ * @property {string} competency_name
+ * @property {number} required_level_id
+ * @property {string} required_level_code
+ * @property {string} required_level_name
+ */
+
+/**
+ * @typedef {object} CompetencyView
+ * @property {number} id
+ * @property {string} code
+ * @property {string} name
+ * @property {string | null} [description]
+ */
+
+/**
+ * @typedef {object} RefCompetencyLevelView
+ * @property {number} id
+ * @property {string} code
+ * @property {string} name
+ * @property {number} order_num
  * @property {boolean} is_active
  */
 
@@ -22,6 +51,7 @@ import { buildRegistryQuery, normalizePage } from './registry.js'
  * @property {boolean} is_active
  * @property {number | null} [salary_min_amount]
  * @property {number | null} [salary_max_amount]
+ * @property {GradeCriterionView[]} [criteria]
  */
 
 /**
@@ -160,5 +190,94 @@ export function updateGrade(gradeId, payload) {
 export function deactivateGrade(gradeId) {
   return /** @type {Promise<void>} */ (
     apiPatch(`/grade-model/grades/${gradeId}/deactivate`, undefined, { parseAs: 'void' })
+  )
+}
+
+/**
+ * @returns {Promise<CompetencyView[]>}
+ */
+export function fetchCompetencies() {
+  return /** @type {Promise<CompetencyView[]>} */ (apiGet('/grade-model/competencies'))
+}
+
+/**
+ * @param {boolean} [onlyActive=true]
+ * @returns {Promise<RefCompetencyLevelView[]>}
+ */
+export function fetchCompetencyLevels(onlyActive = true) {
+  const q = new URLSearchParams({ only_active: String(onlyActive) })
+  return /** @type {Promise<RefCompetencyLevelView[]>} */ (
+    apiGet(`/grade-model/competency-levels?${q.toString()}`)
+  )
+}
+
+/**
+ * @param {{ code: string, name: string, description?: string | null }} payload
+ * @returns {Promise<number>}
+ */
+export function createCompetency(payload) {
+  return /** @type {Promise<number>} */ (apiPost('/grade-model/competencies', payload))
+}
+
+/**
+ * @param {number} competencyId
+ * @param {{ code?: string, name?: string, description?: string | null }} payload
+ * @returns {Promise<CompetencyView>}
+ */
+export function updateCompetency(competencyId, payload) {
+  return /** @type {Promise<CompetencyView>} */ (
+    apiPut(`/grade-model/competencies/${Math.trunc(competencyId)}`, payload)
+  )
+}
+
+/**
+ * @param {number} competencyId
+ * @returns {Promise<void>}
+ */
+export function deleteCompetency(competencyId) {
+  return /** @type {Promise<void>} */ (
+    apiDelete(`/grade-model/competencies/${Math.trunc(competencyId)}`, { parseAs: 'void' })
+  )
+}
+
+/**
+ * @param {number} gradeId
+ * @returns {Promise<GradeCriterionView[]>}
+ */
+export function fetchGradeCriteria(gradeId) {
+  return /** @type {Promise<GradeCriterionView[]>} */ (
+    apiGet(`/grade-model/grades/${Math.trunc(gradeId)}/criteria`)
+  )
+}
+
+/**
+ * @param {number} gradeId
+ * @param {{ competency_id: number, required_level_id: number }} payload
+ * @returns {Promise<number>}
+ */
+export function createGradeCriterion(gradeId, payload) {
+  return /** @type {Promise<number>} */ (
+    apiPost(`/grade-model/grades/${Math.trunc(gradeId)}/criteria`, payload)
+  )
+}
+
+/**
+ * @param {number} criterionId
+ * @param {{ competency_id?: number, required_level_id?: number }} payload
+ * @returns {Promise<GradeCriterionView>}
+ */
+export function updateGradeCriterion(criterionId, payload) {
+  return /** @type {Promise<GradeCriterionView>} */ (
+    apiPut(`/grade-model/criteria/${Math.trunc(criterionId)}`, payload)
+  )
+}
+
+/**
+ * @param {number} criterionId
+ * @returns {Promise<void>}
+ */
+export function deleteGradeCriterion(criterionId) {
+  return /** @type {Promise<void>} */ (
+    apiDelete(`/grade-model/criteria/${Math.trunc(criterionId)}`, { parseAs: 'void' })
   )
 }

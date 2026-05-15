@@ -10,7 +10,8 @@ import './EntityZone.css'
 const PLAN_STATUS_LABEL = {
   DRAFT: 'Черновик',
   ACTIVE: 'Активен',
-  ARCHIVED: 'Архив',
+  COMPLETED: 'Завершён',
+  CLOSED: 'Закрыт',
 }
 
 /**
@@ -192,7 +193,8 @@ export function DevelopmentPlansPage() {
               <option value="">Все</option>
               <option value="DRAFT">Черновик</option>
               <option value="ACTIVE">Активен</option>
-              <option value="ARCHIVED">Архив</option>
+              <option value="COMPLETED">Завершён</option>
+              <option value="CLOSED">Закрыт</option>
             </select>
           </label>
           <label className="entity-zone__field">
@@ -295,7 +297,13 @@ export function DevelopmentPlansPage() {
                 <p className="entity-zone__card-desc entity-zone__task-stats">
                   Запланировано {counts.planned}
                 </p>
-                {plan.approved_at ? <p className="entity-zone__card-desc">Согласовано: {formatDate(plan.approved_at)}</p> : null}
+                {statusKey === 'ACTIVE' ? (
+                  <p className="entity-zone__card-desc">
+                    {plan.approved_at ? `Согласовано: ${formatDate(plan.approved_at)}` : 'Активен'}
+                  </p>
+                ) : statusKey !== 'COMPLETED' && statusKey !== 'CLOSED' ? (
+                  <p className="entity-zone__card-desc entity-zone__task-stats">Ожидает согласования участников</p>
+                ) : null}
               </article>
             )
           })}

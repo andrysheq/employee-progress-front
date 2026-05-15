@@ -144,7 +144,7 @@ export function DevelopmentPlanTaskPage() {
   }, [employees])
 
   const planExecutionReady =
-    plan != null && String(plan.status ?? '').toUpperCase() === 'ACTIVE' && Boolean(plan.approved_at)
+    plan != null && String(plan.status ?? '').toUpperCase() === 'ACTIVE'
 
   const isPlanEmployee =
     plan != null && employeeIdFromJwt != null && Number(plan.employee_id) === Number(employeeIdFromJwt)
@@ -157,6 +157,11 @@ export function DevelopmentPlanTaskPage() {
     Number(plan.team_lead_id) === Number(employeeIdFromJwt)
 
   const st = task ? String(task.status ?? '').toUpperCase() : ''
+  const canAddTaskComment =
+    planExecutionReady &&
+    task != null &&
+    st !== 'DONE' &&
+    (isPlanEmployee || isAssignedTeamLead)
   const statusLabel = TASK_STATUS_LABEL[/** @type {keyof typeof TASK_STATUS_LABEL} */ (st)] ?? task?.status
   const tt = task ? String(task.task_type ?? '').toUpperCase() : ''
   const typeLabel = task
@@ -180,6 +185,17 @@ export function DevelopmentPlanTaskPage() {
       {error ? <div className="entity-zone__error" role="alert">{error}</div> : null}
       {loading ? <p className="entity-zone__loading">Загрузка…</p> : null}
 
+      {!loading && plan && !planExecutionReady ? (
+        <div className="entity-zone__error" role="alert" style={{ marginBottom: '1rem' }}>
+          <p style={{ margin: '0 0 0.5rem' }}>
+            ИПР ещё не согласован всеми участниками. Прогресс по задаче и другие операции недоступны, пока
+            план не станет активным.
+          </p>
+          <Link className="entity-zone__link" to={`/development-plans/${planId}`}>
+            Перейти к согласованию ИПР
+          </Link>
+        </div>
+      ) : null}
       {!loading && task ? (
         <section className="entity-zone__summary">
           <header className="entity-zone__idp-hero">
@@ -250,13 +266,15 @@ export function DevelopmentPlanTaskPage() {
                 ))
               )}
             </div>
-            {isPlanEmployee && planExecutionReady && task && st !== 'DONE' ? (
+            {canAddTaskComment ? (
               <div style={{ marginTop: '1rem' }}>
                 <h3 className="entity-zone__idp-section-title" style={{ fontSize: '1rem' }}>
                   Новый комментарий
                 </h3>
                 <p className="entity-zone__idp-muted" style={{ marginBottom: '0.5rem' }}>
-                  Комментарии фиксируются от имени владельца ИПР (сотрудника).
+                  {isAssignedTeamLead && !isPlanEmployee
+                    ? 'Комментарий будет сохранён от имени тимлида плана.'
+                    : 'Комментарии фиксируются от имени владельца ИПР (сотрудника).'}
                 </p>
                 <textarea
                   className="entity-zone__input"

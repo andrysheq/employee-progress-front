@@ -35,11 +35,29 @@ function normalizeRole(role) {
  * @param {string[] | null | undefined} roles
  * @returns {boolean}
  */
+const GENERAL_DIRECTOR_ROLE_ALIASES = new Set([
+  'Генеральный директор',
+  '1001',
+  'ROLE_GENERAL_DIRECTOR',
+  'GENERAL_DIRECTOR',
+])
+
 export function hasDirectorRole(roles) {
   if (!Array.isArray(roles)) {
     return false
   }
   return roles.some((role) => DIRECTOR_ROLE_ALIASES.has(normalizeRole(role)))
+}
+
+/**
+ * @param {string[] | null | undefined} roles
+ * @returns {boolean}
+ */
+export function hasGeneralDirectorRole(roles) {
+  if (!Array.isArray(roles)) {
+    return false
+  }
+  return roles.some((role) => GENERAL_DIRECTOR_ROLE_ALIASES.has(normalizeRole(role)))
 }
 
 /**

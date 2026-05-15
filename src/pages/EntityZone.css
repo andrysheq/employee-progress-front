@@ -6,6 +6,106 @@
   margin-bottom: 1.25rem;
 }
 
+.entity-zone__toolbar--spread {
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.entity-zone__toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.entity-zone__modal--wide {
+  width: min(960px, 100%);
+}
+
+.entity-zone__competency-table {
+  margin-top: 0.35rem;
+}
+
+.entity-zone__competency-head,
+.entity-zone__competency-row {
+  display: grid;
+  grid-template-columns: minmax(72px, 0.45fr) minmax(140px, 1fr) minmax(160px, 1.5fr) minmax(88px, auto);
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.35rem 0;
+  font-size: 0.8125rem;
+}
+
+.entity-zone__competency-head {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.entity-zone__competency-desc {
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-zone__grade-block {
+  padding-bottom: 0.65rem;
+  margin-bottom: 0.35rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.entity-zone__grade-block:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.entity-zone__grade-criteria {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: #f8fafc;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.entity-zone__grade-criteria-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.entity-zone__criterion-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  padding: 0.25rem 0;
+}
+
+.entity-zone__criterion-row + .entity-zone__criterion-row {
+  border-top: 1px dashed var(--color-border-subtle);
+}
+
+@media (max-width: 720px) {
+  .entity-zone__competency-head,
+  .entity-zone__competency-row {
+    grid-template-columns: 1fr;
+  }
+
+  .entity-zone__competency-head span:last-child {
+    display: none;
+  }
+
+  .entity-zone__competency-row .entity-zone__icon-actions {
+    justify-content: flex-start;
+  }
+}
+
 .entity-zone__toggle {
   display: inline-flex;
   align-items: center;
@@ -316,6 +416,26 @@
   max-width: 520px;
 }
 
+/** Строка «перенос собеседования»: поля с подписью + кнопка по нижнему краю инпутов */
+.entity-zone__filters--reschedule-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  grid-column: 1 / -1;
+  margin-bottom: 0;
+}
+
+.entity-zone__filters--reschedule-row .entity-zone__field {
+  flex: 1 1 180px;
+  margin-bottom: 0;
+}
+
+.entity-zone__actions--reschedule-submit {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+
 .entity-zone__field--grow {
   min-width: 0;
 }
@@ -396,6 +516,11 @@
   margin-bottom: 1rem;
 }
 
+.entity-zone__actions--idp-tl {
+  flex-wrap: wrap;
+  width: 100%;
+}
+
 .entity-zone__button {
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-sm);
@@ -418,6 +543,16 @@
 
 .entity-zone__button--primary:hover {
   filter: brightness(0.95);
+}
+
+.entity-zone__button--end {
+  margin-left: auto;
+}
+
+.entity-zone__button--accent-on-hover:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
 }
 
 .entity-zone__metrics {

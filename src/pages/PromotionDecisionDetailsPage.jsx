@@ -124,7 +124,7 @@ export function PromotionDecisionDetailsPage() {
                   </Link>
                 </p>
                 <p className="entity-zone__idp-muted">
-                  Цикл ревью:{' '}
+                  Собеседование:{' '}
                   <Link className="entity-zone__inline-link" to={`/reviews/${item.review_cycle_id}`}>
                     #{item.review_cycle_id}
                   </Link>

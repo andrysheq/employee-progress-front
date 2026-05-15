@@ -4,40 +4,9 @@ import { ApiError, departmentsApi, developmentPlansApi, employeesApi, gradeModel
 import { useAuth } from '../auth/useAuth.js'
 import { hasTeamLeadRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { idpTaskDraftToApiPayload, newIdpTaskDraft } from '../utils/idpTaskDraft.js'
 import './pages.css'
 import './EntityZone.css'
-
-function newTaskDraft() {
-  return {
-    taskType: 'LEARNING',
-    taskTitle: '',
-    taskDescription: '',
-    taskSuccessCriteria: '',
-    taskPriority: 'MIDDLE',
-    taskPlannedStartDate: '',
-    taskDurationDays: '14',
-    taskEffortHoursPlanned: '8',
-  }
-}
-
-/**
- * @param {import('../api/developmentPlans.js').DevelopmentPlanTaskCreateRequest} row
- */
-function taskDraftToApiPayload(row) {
-  const taskDurationDays = Number(row.taskDurationDays)
-  const taskEffortHoursPlanned =
-    row.taskEffortHoursPlanned.trim() === '' ? null : Number(row.taskEffortHoursPlanned)
-  return {
-    task_type: row.taskType,
-    title: row.taskTitle.trim(),
-    description: row.taskDescription.trim(),
-    success_criteria: row.taskSuccessCriteria.trim(),
-    priority: row.taskPriority,
-    planned_start_date: row.taskPlannedStartDate || null,
-    duration_days: Math.trunc(taskDurationDays),
-    effort_hours_planned: taskEffortHoursPlanned == null ? null : Math.trunc(taskEffortHoursPlanned),
-  }
-}
 
 export function DevelopmentPlanCreatePage() {
   const { companyId } = resolveCompanyId()
@@ -75,7 +44,7 @@ export function DevelopmentPlanCreatePage() {
     periodStart: '',
     periodEnd: '',
   })
-  const [taskDrafts, setTaskDrafts] = useState(() => [newTaskDraft()])
+  const [taskDrafts, setTaskDrafts] = useState(() => [newIdpTaskDraft()])
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedEmployeeSearch(employeeSearchInput.trim()), 320)
@@ -348,7 +317,7 @@ export function DevelopmentPlanCreatePage() {
         setSubmitError(`Плановая трудоёмкость задачи №${i + 1} должна быть неотрицательным числом`)
         return
       }
-      tasksPayload.push(taskDraftToApiPayload(row))
+      tasksPayload.push(idpTaskDraftToApiPayload(row))
     }
 
     setSubmitting(true)
@@ -686,7 +655,7 @@ export function DevelopmentPlanCreatePage() {
         ))}
 
         <div className="entity-zone__actions">
-          <button type="button" className="entity-zone__button" onClick={() => setTaskDrafts((prev) => [...prev, newTaskDraft()])}>
+          <button type="button" className="entity-zone__button" onClick={() => setTaskDrafts((prev) => [...prev, newIdpTaskDraft()])}>
             Добавить задачу
           </button>
           <button
