@@ -9,6 +9,8 @@ import { EmployeesPage } from '../pages/EmployeesPage'
 import { EmployeeDetailsPage } from '../pages/EmployeeDetailsPage'
 import { PoliciesPage } from '../pages/PoliciesPage'
 import { DevelopmentPlansPage } from '../pages/DevelopmentPlansPage'
+import { DevelopmentPlanDetailsPage } from '../pages/DevelopmentPlanDetailsPage'
+import { DevelopmentPlanTaskPage } from '../pages/DevelopmentPlanTaskPage'
 import { ReviewsPage } from '../pages/ReviewsPage'
 import { PromotionDecisionsPage } from '../pages/PromotionDecisionsPage'
 import { ReportsPage } from '../pages/ReportsPage'
@@ -31,6 +33,8 @@ export const router = createBrowserRouter([
       { path: 'employees/:employeeId', element: <EmployeeDetailsPage /> },
       { path: 'policies', element: <PoliciesPage /> },
       { path: 'development-plans', element: <DevelopmentPlansPage /> },
+      { path: 'development-plans/:planId', element: <DevelopmentPlanDetailsPage /> },
+      { path: 'development-plans/:planId/tasks/:taskId', element: <DevelopmentPlanTaskPage /> },
       { path: 'reviews', element: <ReviewsPage /> },
       { path: 'promotion-decisions', element: <PromotionDecisionsPage /> },
       { path: 'reports', element: <ReportsPage /> },

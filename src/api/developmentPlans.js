@@ -17,6 +17,11 @@ import { buildRegistryQuery, normalizePage } from './registry.js'
 /**
  * @typedef {object} DevelopmentPlanCompetencyItemView
  * @property {number} id
+ * @property {string} [competency_name]
+ * @property {string} [competency_code]
+ * @property {boolean} [approved]
+ * @property {string | null} [team_lead_comment]
+ * @property {number[]} [related_task_ids]
  */
 
 /**
@@ -52,6 +57,53 @@ export function fetchEmployeePlans(employeeId) {
  */
 export function fetchDevelopmentPlanById(planId) {
   return /** @type {Promise<DevelopmentPlanView>} */ (apiGet(`/development-plans/${Math.trunc(planId)}`))
+}
+
+/**
+ * @param {number} planId
+ * @returns {Promise<DevelopmentPlanTaskView[]>}
+ */
+export function fetchPlanTasks(planId) {
+  return /** @type {Promise<DevelopmentPlanTaskView[]>} */ (
+    apiGet(`/development-plans/${Math.trunc(planId)}/tasks`)
+  )
+}
+
+/**
+ * @param {number} planId
+ * @returns {Promise<DevelopmentPlanCompetencyItemView[]>}
+ */
+export function fetchPlanCompetencyItems(planId) {
+  return /** @type {Promise<DevelopmentPlanCompetencyItemView[]>} */ (
+    apiGet(`/development-plans/${Math.trunc(planId)}/competency-items`)
+  )
+}
+
+/**
+ * @param {number} planId
+ * @param {number} taskId
+ * @returns {Promise<Array<{ id: number, task_id: number, progress_percent: number, comment: string | null, created_at: string, created_by_employee_id: number }>>}
+ */
+export function fetchTaskProgressHistory(planId, taskId) {
+  return apiGet(`/development-plans/${Math.trunc(planId)}/tasks/${Math.trunc(taskId)}/progress-history`)
+}
+
+/**
+ * @param {number} planId
+ * @param {number} taskId
+ * @returns {Promise<Array<{ id: number, task_id: number, comment: string, created_at: string, created_by_employee_id: number }>>}
+ */
+export function fetchTaskComments(planId, taskId) {
+  return apiGet(`/development-plans/${Math.trunc(planId)}/tasks/${Math.trunc(taskId)}/comments`)
+}
+
+/**
+ * @param {number} planId
+ * @param {number} taskId
+ * @returns {Promise<Array<{ id: number, task_id: number, file_name: string, content_type: string, size_bytes: number, created_at: string, download_url: string }>>}
+ */
+export function fetchTaskAttachments(planId, taskId) {
+  return apiGet(`/development-plans/${Math.trunc(planId)}/tasks/${Math.trunc(taskId)}/attachments`)
 }
 
 /**

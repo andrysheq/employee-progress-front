@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+﻿import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, developmentPlansApi, employeesApi, gradeModelApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
 import { hasTeamLeadRole } from '../auth/roleChecks.js'
@@ -11,24 +11,6 @@ const PLAN_STATUS_LABEL = {
   DRAFT: 'Черновик',
   ACTIVE: 'Активен',
   ARCHIVED: 'Архив',
-}
-
-const TASK_STATUS_LABEL = {
-  PLANNED: 'Запланирована',
-  IN_PROGRESS: 'В работе',
-  DONE: 'Выполнена',
-}
-
-const TASK_TYPE_LABEL = {
-  LEARNING: 'Обучение',
-  PROJECT: 'Проект',
-  SOFT_SKILL: 'Soft skills',
-}
-
-const TASK_PRIORITY_LABEL = {
-  HIGH: 'Высокий',
-  MIDDLE: 'Средний',
-  LOW: 'Низкий',
 }
 
 /**
@@ -84,6 +66,7 @@ function buildEmployeeNameMap(employees) {
 export function DevelopmentPlansPage() {
   const { companyId } = resolveCompanyId()
   const { roles, employeeIdFromJwt } = useAuth()
+  const navigate = useNavigate()
   const canCreatePlan = hasTeamLeadRole(roles)
 
   const [employeeNameLike, setEmployeeNameLike] = useState('')
@@ -102,8 +85,6 @@ export function DevelopmentPlansPage() {
   const [plans, setPlans] = useState(
     /** @type {import('../api/developmentPlans.js').DevelopmentPlanView[] | null} */ (null),
   )
-  const [expandedPlanId, setExpandedPlanId] = useState(/** @type {number | null} */ (null))
-
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState(/** @type {string | null} */ (null))
   const [createForm, setCreateForm] = useState({
@@ -584,76 +565,51 @@ export function DevelopmentPlansPage() {
         <p className="entity-zone__empty">ИПР по текущим фильтрам не найдены.</p>
       ) : null}
 
-      {!loading && plans && plans.length > 0 ? (
-        <div className="entity-zone__grid">
+            {!loading && plans && plans.length > 0 ? (
+        <div className="entity-zone__grid entity-zone__grid--idp">
           {plans.map((plan) => {
             const tasks = Array.isArray(plan.tasks) ? plan.tasks : []
             const counts = taskStatusCounts(tasks)
-            const competencyCount = Array.isArray(plan.competency_items) ? plan.competency_items.length : 0
+            const competencyItems = Array.isArray(plan.competency_items) ? plan.competency_items : []
+            const competencyCount = competencyItems.length
             const statusKey = typeof plan.status === 'string' ? plan.status.toUpperCase() : plan.status
             const statusLabel = PLAN_STATUS_LABEL[/** @type {keyof typeof PLAN_STATUS_LABEL} */ (statusKey)] ?? plan.status
-            const expanded = expandedPlanId === plan.id
             const employeeName = employeeNameMap.get(plan.employee_id) ?? 'Сотрудник'
+            const planUrl = `/development-plans/${plan.id}`
 
             return (
-              <article key={plan.id} className="entity-zone__card entity-zone__card--panel">
+              <article
+                key={plan.id}
+                className="entity-zone__card entity-zone__card--panel entity-zone__card--clickable"
+                role="link"
+                tabIndex={0}
+                aria-label={`Открыть ИПР: ${employeeName}`}
+                onClick={() => navigate(planUrl)}
+                onKeyDown={(ev) => {
+                  if (ev.key === 'Enter' || ev.key === ' ') {
+                    ev.preventDefault()
+                    navigate(planUrl)
+                  }
+                }}
+              >
                 <div className="entity-zone__card-name">{employeeName}</div>
-                <div className="entity-zone__card-code">{statusLabel}</div>
+                <div className="entity-zone__card-code entity-zone__card-code--status-lg">{statusLabel}</div>
                 <div className="entity-zone__card-desc">
                   Период: {formatDate(plan.period_start)} — {formatDate(plan.period_end)}
                 </div>
                 <div className="entity-zone__card-meta">
                   <span className="entity-zone__badge">Задач: {tasks.length}</span>
-                  <span className="entity-zone__badge">
-                    Выполнено {counts.done} · в работе {counts.inProgress} · запланировано {counts.planned}
-                  </span>
-                  {competencyCount > 0 ? <span className="entity-zone__badge">Компетенций: {competencyCount}</span> : null}
+                  <span className="entity-zone__badge">Компетенций: {competencyCount}</span>
                   {plan.team_lead_plan_score_hundredths != null ? (
                     <span className="entity-zone__badge">
                       Оценка тимлида (сред.): {(plan.team_lead_plan_score_hundredths / 100).toFixed(2)}
                     </span>
                   ) : null}
                 </div>
+                <p className="entity-zone__card-desc entity-zone__task-stats">
+                  Выполнено {counts.done} · В работе {counts.inProgress} · Запланировано {counts.planned}
+                </p>
                 {plan.approved_at ? <p className="entity-zone__card-desc">Согласовано: {formatDate(plan.approved_at)}</p> : null}
-                <div className="entity-zone__actions entity-zone__actions--tight">
-                  <button
-                    type="button"
-                    className="entity-zone__button"
-                    onClick={() => setExpandedPlanId(expanded ? null : plan.id)}
-                    aria-expanded={expanded}
-                  >
-                    {expanded ? 'Свернуть задачи' : 'Задачи'}
-                  </button>
-                </div>
-                {expanded ? (
-                  <ul className="entity-zone__task-list">
-                    {tasks.length === 0 ? (
-                      <li className="entity-zone__muted">Задачи не добавлены.</li>
-                    ) : (
-                      tasks.map((task) => {
-                        const st = typeof task.status === 'string' ? task.status.toUpperCase() : ''
-                        const taskStLabel = TASK_STATUS_LABEL[/** @type {keyof typeof TASK_STATUS_LABEL} */ (st)] ?? task.status
-                        const tt = typeof task.task_type === 'string' ? task.task_type.toUpperCase() : ''
-                        const typeLabel = TASK_TYPE_LABEL[/** @type {keyof typeof TASK_TYPE_LABEL} */ (tt)] ?? (task.task_type ?? '—')
-                        const pr = typeof task.priority === 'string' ? task.priority.toUpperCase() : ''
-                        const priorityLabel =
-                          TASK_PRIORITY_LABEL[/** @type {keyof typeof TASK_PRIORITY_LABEL} */ (pr)] ?? task.priority ?? '—'
-                        return (
-                          <li key={task.id} className="entity-zone__task-list-item">
-                            <div className="entity-zone__task-list-title">{task.title}</div>
-                            <div className="entity-zone__task-list-meta">
-                              <span>{typeLabel}</span>
-                              <span>{taskStLabel}</span>
-                              <span>приоритет: {priorityLabel}</span>
-                              <span>до {formatDate(task.due_date)}</span>
-                              {task.team_lead_task_score != null ? <span>оценка: {task.team_lead_task_score}</span> : null}
-                            </div>
-                          </li>
-                        )
-                      })
-                    )}
-                  </ul>
-                ) : null}
               </article>
             )
           })}
@@ -662,3 +618,4 @@ export function DevelopmentPlansPage() {
     </article>
   )
 }
+

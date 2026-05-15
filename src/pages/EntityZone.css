@@ -71,6 +71,27 @@
   background: #fff;
 }
 
+.entity-zone__grid--idp {
+  padding: 0.35rem;
+  gap: 1.5rem;
+}
+
+.entity-zone__card--clickable {
+  cursor: pointer;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  transform-origin: center center;
+}
+
+.entity-zone__card--clickable:hover {
+  transform: scale(1.03);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.1);
+}
+
+.entity-zone__card--clickable:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
 .entity-zone__card--selected {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
@@ -120,6 +141,10 @@
   font-family: ui-monospace, monospace;
 }
 
+.entity-zone__card-code--status-lg {
+  font-size: 0.875rem;
+}
+
 .entity-zone__card-meta {
   display: flex;
   flex-wrap: wrap;
@@ -166,6 +191,10 @@
   color: var(--color-text-muted);
   margin-top: 0.25rem;
   line-height: 1.4;
+}
+
+.entity-zone__task-stats {
+  margin-top: 0.1rem;
 }
 
 .entity-zone__empty {
@@ -583,5 +612,162 @@
 
 .entity-zone__grid--employees .entity-zone__card-name {
   word-break: break-word;
+}
+
+/* ИПР: детали и задачи */
+.entity-zone__idp-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.entity-zone__idp-hero-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.entity-zone__idp-hero-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.25;
+  margin: 0;
+}
+
+.entity-zone__idp-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.entity-zone__idp-section {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.entity-zone__idp-section:first-of-type {
+  margin-top: 0.5rem;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.entity-zone__idp-section-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 0.75rem;
+}
+
+.entity-zone__idp-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.entity-zone__idp-card {
+  border-radius: var(--radius-md);
+  background: #f9fafb;
+  border: 1px solid var(--color-border-subtle);
+  padding: 0.85rem 1rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.entity-zone__idp-card:hover {
+  border-color: rgba(37, 99, 235, 0.25);
+  background: #fff;
+}
+
+.entity-zone__idp-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.entity-zone__idp-card-title {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.entity-zone__idp-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.entity-zone__idp-chip {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: var(--color-text-muted);
+}
+
+.entity-zone__idp-chip--status-planned {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.entity-zone__idp-chip--status-progress {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.entity-zone__idp-chip--status-done {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.entity-zone__idp-chip--ok {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.entity-zone__idp-chip--pending {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.entity-zone__idp-link {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.entity-zone__idp-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.entity-zone__idp-muted {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.entity-zone__idp-task-desc {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin: 0.35rem 0 0;
+  line-height: 1.45;
 }
 
