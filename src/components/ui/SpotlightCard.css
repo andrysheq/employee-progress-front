@@ -4,9 +4,9 @@
  */
 
 .spotlight-card {
-  --sc-saturation: 100;
-  --sc-lightness: 70;
-  --sc-lightness-border: 50;
+  --sc-saturation: 58;
+  --sc-lightness: 64;
+  --sc-lightness-border: 48;
   --sc-bg-spot-opacity: 0.12;
   --sc-border-spot-opacity: 1;
   --sc-border-light-opacity: 1;
@@ -16,6 +16,8 @@
   --sc-y: 0;
   --sc-xp: 0.5;
   --sc-yp: 0.5;
+  --sc-backup-border: var(--border);
+  --sc-backdrop: color-mix(in srgb, var(--card) 92%, var(--muted));
 
   box-sizing: border-box;
   position: relative;
@@ -39,9 +41,7 @@
   background-position: 50% 50%;
   background-attachment: fixed;
 
-  box-shadow: 0 1rem 2rem -1rem rgb(0 0 0 / 0.35);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
+  box-shadow: var(--ui-shadow-lg);
   overflow: hidden;
 }
 
@@ -130,8 +130,8 @@
 
 /* Без цветного glow: сохраняем форму карточки и «стекло», убираем радугу и слои обводки */
 .spotlight-card--neutral {
-  border: 1px solid hsl(0 0% 60% / 0.16);
-  background-color: hsl(0 0% 100% / 0.82);
+  border: 1px solid var(--border);
+  background-color: var(--card);
   background-image: none;
   background-attachment: scroll;
 }

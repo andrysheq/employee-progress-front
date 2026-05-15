@@ -5,6 +5,7 @@ import { useAuth } from '../auth/useAuth.js'
 import { hasDirectorRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
+import { SelectDropdown } from '../components/ui/SelectDropdown.jsx'
 import './pages.css'
 import './EntityZone.css'
 
@@ -440,19 +441,20 @@ export function ReviewCycleDetailsPage() {
                     <>
                       <label className="entity-zone__field entity-zone__field--grow">
                         <span className="entity-zone__field-label">Целевой грейд</span>
-                        <select
-                          className="entity-zone__select"
+                        <SelectDropdown
                           value={targetGradeId}
-                          onChange={(ev) => setTargetGradeId(ev.target.value)}
+                          onChange={setTargetGradeId}
+                          placeholder="Выберите грейд"
                           disabled={actionBusy || gradeOptionsLoading || eligibleGrades.length === 0}
-                        >
-                          <option value="">Выберите грейд</option>
-                          {eligibleGrades.map((g) => (
-                            <option key={g.id} value={String(g.id)}>
-                              {g.name} (уровень {g.level_order})
-                            </option>
-                          ))}
-                        </select>
+                          options={[
+                            { value: '', label: 'Выберите грейд' },
+                            ...eligibleGrades.map((g) => ({
+                              value: String(g.id),
+                              label: g.name,
+                              description: `Уровень ${g.level_order}`,
+                            })),
+                          ]}
+                        />
                         {gradeOptionsMessage ? (
                           <span className="entity-zone__idp-muted" style={{ display: 'block', marginTop: '0.25rem' }}>
                             {gradeOptionsMessage}

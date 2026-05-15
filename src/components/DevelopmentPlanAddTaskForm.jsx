@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { ApiError, developmentPlansApi } from '../api/index.js'
 import { idpTaskDraftToApiPayload, newIdpTaskDraft } from '../utils/idpTaskDraft.js'
+import { IDP_TASK_PRIORITY_OPTIONS, IDP_TASK_TYPE_OPTIONS } from '../utils/idpSelectOptions.js'
+import { SelectDropdown } from './ui/SelectDropdown.jsx'
 
 /**
  * @param {object} props
@@ -25,27 +27,19 @@ export function DevelopmentPlanAddTaskForm({ planId, defaultPlannedStartDate, on
       <div className="entity-zone__filters entity-zone__filters--idp-task-row1">
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Тип</span>
-          <select
-            className="entity-zone__select"
+          <SelectDropdown
             value={draft.taskType}
-            onChange={(ev) => setDraft((prev) => ({ ...prev, taskType: ev.target.value }))}
-          >
-            <option value="LEARNING">Обучение</option>
-            <option value="PROJECT">Проект</option>
-            <option value="SOFT_SKILL">Soft skills</option>
-          </select>
+            onChange={(next) => setDraft((prev) => ({ ...prev, taskType: next }))}
+            options={IDP_TASK_TYPE_OPTIONS}
+          />
         </label>
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Приоритет</span>
-          <select
-            className="entity-zone__select"
+          <SelectDropdown
             value={draft.taskPriority}
-            onChange={(ev) => setDraft((prev) => ({ ...prev, taskPriority: ev.target.value }))}
-          >
-            <option value="HIGH">Высокий</option>
-            <option value="MIDDLE">Средний</option>
-            <option value="LOW">Низкий</option>
-          </select>
+            onChange={(next) => setDraft((prev) => ({ ...prev, taskPriority: next }))}
+            options={IDP_TASK_PRIORITY_OPTIONS}
+          />
         </label>
         <label className="entity-zone__field entity-zone__field--grow">
           <span className="entity-zone__field-label">Название</span>

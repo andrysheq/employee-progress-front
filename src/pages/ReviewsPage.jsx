@@ -5,6 +5,7 @@ import { useAuth } from '../auth/useAuth.js'
 import { hasDirectorRole, hasGeneralDirectorRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
+import { SelectDropdown } from '../components/ui/SelectDropdown.jsx'
 import './pages.css'
 import './EntityZone.css'
 
@@ -17,6 +18,13 @@ const STATUS_LABEL = {
   COMPLETED: 'Завершён',
   CANCELLED: 'Отменён',
 }
+
+const STATUS_FILTER_OPTIONS = [
+  { value: '', label: 'Все' },
+  { value: 'SCHEDULED', label: 'Запланирован', description: 'Ожидают проведения' },
+  { value: 'COMPLETED', label: 'Завершён', description: 'Итог зафиксирован' },
+  { value: 'CANCELLED', label: 'Отменён', description: 'Собеседование отменено' },
+]
 
 /**
  * @returns {string}
@@ -293,23 +301,24 @@ export function ReviewsPage() {
           <form className="entity-zone__filters" onSubmit={(ev) => void handleScheduleFinalReview(ev)}>
             <label className="entity-zone__field entity-zone__field--grow">
               <span className="entity-zone__field-label">Сотрудник</span>
-              <select
-                className="entity-zone__select"
+              <SelectDropdown
                 value={scheduleEmployeeId}
-                onChange={(ev) => setScheduleEmployeeId(ev.target.value)}
+                onChange={setScheduleEmployeeId}
+                placeholder="Выберите сотрудника"
                 disabled={scheduleBusy || scheduleEmployeeOptions.length === 0}
-              >
-                <option value="">Выберите сотрудника</option>
-                {scheduleEmployeeOptions.map((employee) => {
-                  const hasOpen = openFinalReviewEmployeeIds.has(employee.id)
-                  return (
-                    <option key={employee.id} value={String(employee.id)} disabled={hasOpen}>
-                      {employee.full_name}
-                      {hasOpen ? ' (собеседование уже запланировано)' : ''}
-                    </option>
-                  )
-                })}
-              </select>
+                options={[
+                  { value: '', label: 'Выберите сотрудника' },
+                  ...scheduleEmployeeOptions.map((employee) => {
+                    const hasOpen = openFinalReviewEmployeeIds.has(employee.id)
+                    return {
+                      value: String(employee.id),
+                      label: employee.full_name,
+                      description: hasOpen ? 'Собеседование уже запланировано' : undefined,
+                      disabled: hasOpen,
+                    }
+                  }),
+                ]}
+              />
             </label>
             <label className="entity-zone__field">
               <span className="entity-zone__field-label">Плановая дата и время</span>
@@ -357,12 +366,7 @@ export function ReviewsPage() {
         </label>
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Статус</span>
-          <select className="entity-zone__select" value={status} onChange={(ev) => setStatus(ev.target.value)}>
-            <option value="">Все</option>
-            <option value="SCHEDULED">Запланирован</option>
-            <option value="COMPLETED">Завершён</option>
-            <option value="CANCELLED">Отменён</option>
-          </select>
+          <SelectDropdown value={status} onChange={setStatus} options={STATUS_FILTER_OPTIONS} />
         </label>
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Период: с</span>

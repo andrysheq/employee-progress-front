@@ -4,6 +4,7 @@ import { ApiError, developmentPlansApi, employeesApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
 import { hasTeamLeadRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { SelectDropdown } from '../components/ui/SelectDropdown.jsx'
 import './pages.css'
 import './EntityZone.css'
 
@@ -13,6 +14,14 @@ const PLAN_STATUS_LABEL = {
   COMPLETED: 'Завершён',
   CLOSED: 'Закрыт',
 }
+
+const PLAN_STATUS_FILTER_OPTIONS = [
+  { value: '', label: 'Все' },
+  { value: 'DRAFT', label: 'Черновик', description: 'План ещё не утверждён' },
+  { value: 'ACTIVE', label: 'Активен', description: 'В работе' },
+  { value: 'COMPLETED', label: 'Завершён', description: 'Цели достигнуты' },
+  { value: 'CLOSED', label: 'Закрыт', description: 'Архив' },
+]
 
 /**
  * @param {string | null | undefined} isoDate
@@ -189,13 +198,7 @@ export function DevelopmentPlansPage() {
           </label>
           <label className="entity-zone__field">
             <span className="entity-zone__field-label">Статус</span>
-            <select className="entity-zone__select" value={statusFilter} onChange={(ev) => setStatusFilter(ev.target.value)}>
-              <option value="">Все</option>
-              <option value="DRAFT">Черновик</option>
-              <option value="ACTIVE">Активен</option>
-              <option value="COMPLETED">Завершён</option>
-              <option value="CLOSED">Закрыт</option>
-            </select>
+            <SelectDropdown value={statusFilter} onChange={setStatusFilter} options={PLAN_STATUS_FILTER_OPTIONS} />
           </label>
           <label className="entity-zone__field">
             <span className="entity-zone__field-label">Период с</span>

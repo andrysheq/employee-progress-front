@@ -4,8 +4,15 @@ import { ApiError, promotionPoliciesApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
 import { hasDirectorRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { SelectDropdown } from '../components/ui/SelectDropdown.jsx'
 import './pages.css'
 import './EntityZone.css'
+
+const POLICY_ACTIVE_FILTER_OPTIONS = [
+  { value: 'active', label: 'Только активные', description: 'Действующие политики' },
+  { value: 'inactive', label: 'Только неактивные', description: 'Неактивные записи' },
+  { value: 'all', label: 'Все', description: 'Показать весь справочник' },
+]
 
 /**
  * @param {number | string | undefined | null} v
@@ -182,15 +189,7 @@ export function PoliciesPage() {
           </label>
           <label className="entity-zone__field">
             <span className="entity-zone__field-label">Статус</span>
-            <select
-              className="entity-zone__select"
-              value={activeFilter}
-              onChange={(ev) => setActiveFilter(ev.target.value)}
-            >
-              <option value="active">Только активные</option>
-              <option value="inactive">Только неактивные</option>
-              <option value="all">Все</option>
-            </select>
+            <SelectDropdown value={activeFilter} onChange={setActiveFilter} options={POLICY_ACTIVE_FILTER_OPTIONS} />
           </label>
           <label className="entity-zone__field">
             <span className="entity-zone__field-label">Действует с</span>

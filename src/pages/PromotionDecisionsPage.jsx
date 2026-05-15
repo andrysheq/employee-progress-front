@@ -5,6 +5,7 @@ import { useAuth } from '../auth/useAuth.js'
 import { hasDirectorRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
+import { SelectDropdown } from '../components/ui/SelectDropdown.jsx'
 import './pages.css'
 import './EntityZone.css'
 
@@ -12,6 +13,12 @@ const DECISION_LABEL = {
   APPROVED: 'Одобрено',
   REJECTED: 'Отклонено',
 }
+
+const DECISION_FILTER_OPTIONS = [
+  { value: '', label: 'Все' },
+  { value: 'APPROVED', label: 'Одобрено', description: 'Повышение согласовано' },
+  { value: 'REJECTED', label: 'Отклонено', description: 'Повышение не согласовано' },
+]
 
 /**
  * @param {string | null | undefined} text
@@ -154,22 +161,19 @@ export function PromotionDecisionsPage() {
         </label>
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Тимлид</span>
-          <select className="entity-zone__select" value={teamLeadId} onChange={(ev) => setTeamLeadId(ev.target.value)}>
-            <option value="">Все</option>
-            {sortedEmployees.map((emp) => (
-              <option key={emp.id} value={String(emp.id)}>
-                {emp.full_name}
-              </option>
-            ))}
-          </select>
+          <SelectDropdown
+            value={teamLeadId}
+            onChange={setTeamLeadId}
+            placeholder="Все"
+            options={[
+              { value: '', label: 'Все' },
+              ...sortedEmployees.map((emp) => ({ value: String(emp.id), label: emp.full_name })),
+            ]}
+          />
         </label>
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Решение</span>
-          <select className="entity-zone__select" value={decision} onChange={(ev) => setDecision(ev.target.value)}>
-            <option value="">Все</option>
-            <option value="APPROVED">Одобрено</option>
-            <option value="REJECTED">Отклонено</option>
-          </select>
+          <SelectDropdown value={decision} onChange={setDecision} options={DECISION_FILTER_OPTIONS} />
         </label>
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Период: с</span>

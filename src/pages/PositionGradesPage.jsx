@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ApiError, gradeModelApi } from '../api/index.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import { ConfirmDialog } from '../components/ConfirmDialog.jsx'
+import { SelectDropdown } from '../components/ui/SelectDropdown.jsx'
 import './pages.css'
 import './EntityZone.css'
 
@@ -818,37 +819,35 @@ export function PositionGradesPage() {
             <div className="entity-zone__filters entity-zone__filters--row">
               <label className="entity-zone__field entity-zone__field--wide">
                 <span className="entity-zone__field-label">Компетенция</span>
-                <select
-                  className="entity-zone__select"
+                <SelectDropdown
                   value={criterionForm.competencyId}
-                  onChange={(ev) =>
-                    setCriterionForm((f) => (f ? { ...f, competencyId: ev.target.value } : f))
-                  }
-                >
-                  <option value="">Выберите компетенцию</option>
-                  {competencies.map((co) => (
-                    <option key={co.id} value={String(co.id)}>
-                      {co.code ? `${co.code} — ${co.name}` : co.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(next) => setCriterionForm((f) => (f ? { ...f, competencyId: next } : f))}
+                  placeholder="Выберите компетенцию"
+                  options={[
+                    { value: '', label: 'Выберите компетенцию' },
+                    ...competencies.map((co) => ({
+                      value: String(co.id),
+                      label: co.code ? `${co.code} — ${co.name}` : co.name,
+                      description: co.name && co.code ? co.name : undefined,
+                    })),
+                  ]}
+                />
               </label>
               <label className="entity-zone__field entity-zone__field--wide">
                 <span className="entity-zone__field-label">Требуемый уровень</span>
-                <select
-                  className="entity-zone__select"
+                <SelectDropdown
                   value={criterionForm.requiredLevelId}
-                  onChange={(ev) =>
-                    setCriterionForm((f) => (f ? { ...f, requiredLevelId: ev.target.value } : f))
-                  }
-                >
-                  <option value="">Выберите уровень</option>
-                  {competencyLevels.map((lv) => (
-                    <option key={lv.id} value={String(lv.id)}>
-                      {lv.code ? `${lv.code} — ${lv.name}` : lv.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(next) => setCriterionForm((f) => (f ? { ...f, requiredLevelId: next } : f))}
+                  placeholder="Выберите уровень"
+                  options={[
+                    { value: '', label: 'Выберите уровень' },
+                    ...competencyLevels.map((lv) => ({
+                      value: String(lv.id),
+                      label: lv.code ? `${lv.code} — ${lv.name}` : lv.name,
+                      description: lv.name && lv.code ? lv.name : undefined,
+                    })),
+                  ]}
+                />
               </label>
             </div>
 

@@ -40,7 +40,7 @@ export function LoginPage() {
 
   return (
     <PageBackground>
-      <div className="login-page">
+      <div className="login-page app-page-transition">
         <div className="login-card">
           <h1 className="login-card__title">Вход</h1>
           <p className="login-card__lead">

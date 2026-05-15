@@ -151,7 +151,8 @@ export function AuthProvider({ children }) {
   )
 
   const value = useMemo(() => {
-    const { jwtEmployeeIdClaim: _jwtEmployeeIdClaim, ...rest } = snapshot
+    const rest = { ...snapshot }
+    delete rest.jwtEmployeeIdClaim
     return {
       ...rest,
       employeeIdFromJwt: effectiveEmployeeId,

@@ -5,15 +5,12 @@
   isolation: isolate;
   min-height: 100svh;
   width: 100%;
-  background: #ffffff;
+  background: var(--background);
 }
 
 .page-background-root__backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
+  /* Градиенты отключены: на практике снижали контраст текста на всех экранах */
+  display: none;
 }
 
 .page-background-root__layer {
@@ -23,11 +20,11 @@
 
 /* Purple glow — top left, blurred */
 .page-background-root__layer--purple {
-  background-color: #ffffff;
+  background-color: var(--background);
   background-image: radial-gradient(
     circle at top left,
-    rgba(173, 109, 244, 0.5),
-    transparent 70%
+    color-mix(in srgb, var(--primary) 12%, transparent),
+    transparent 74%
   );
   background-repeat: no-repeat;
   filter: blur(80px);
@@ -35,8 +32,12 @@
 
 /* Soft yellow center — multiply blend */
 .page-background-root__layer--yellow {
-  background-image: radial-gradient(circle at center, #fff991 0%, transparent 70%);
-  opacity: 0.6;
+  background-image: radial-gradient(
+    circle at center,
+    color-mix(in srgb, var(--chart-4) 24%, var(--card)) 0%,
+    transparent 76%
+  );
+  opacity: 0.22;
   mix-blend-mode: multiply;
 }
 

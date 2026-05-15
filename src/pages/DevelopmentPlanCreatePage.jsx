@@ -5,6 +5,8 @@ import { useAuth } from '../auth/useAuth.js'
 import { hasTeamLeadRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import { idpTaskDraftToApiPayload, newIdpTaskDraft } from '../utils/idpTaskDraft.js'
+import { IDP_TASK_PRIORITY_OPTIONS, IDP_TASK_TYPE_OPTIONS } from '../utils/idpSelectOptions.js'
+import { SelectDropdown } from '../components/ui/SelectDropdown.jsx'
 import './pages.css'
 import './EntityZone.css'
 
@@ -356,6 +358,35 @@ export function DevelopmentPlanCreatePage() {
     taskDrafts,
   ])
 
+  const targetGradePlaceholder = useMemo(() => {
+    if (selectedEmployee == null) {
+      return 'Сначала выберите сотрудника'
+    }
+    if (gradeOptionsLoading) {
+      return 'Загрузка грейдов…'
+    }
+    if (eligibleGrades.length === 0) {
+      return 'Нет доступных грейдов'
+    }
+    return 'Выберите грейд'
+  }, [selectedEmployee, gradeOptionsLoading, eligibleGrades.length])
+
+  const targetGradeOptions = useMemo(
+    () =>
+      eligibleGrades.map((grade) => {
+        const pid = grade.position_id
+        const posLabel = typeof pid === 'number' ? positionLabels[pid] || `Должность #${pid}` : ''
+        const gName = String(grade.name ?? '').trim()
+        const label = posLabel ? `${posLabel}: ${gName}` : gName
+        return {
+          value: String(grade.id),
+          label,
+          description: posLabel ? gName : undefined,
+        }
+      }),
+    [eligibleGrades, positionLabels],
+  )
+
   if (!canCreatePlan) {
     return (
       <article className="page">
@@ -469,38 +500,13 @@ export function DevelopmentPlanCreatePage() {
 
           <label className="entity-zone__field">
             <span className="entity-zone__field-label">Целевой грейд</span>
-            <select
-              className="entity-zone__select"
+            <SelectDropdown
               value={createForm.targetGradeId}
-              disabled={
-                selectedEmployee == null || gradeOptionsLoading || eligibleGrades.length === 0
-              }
-              onChange={(ev) => setCreateForm((prev) => ({ ...prev, targetGradeId: ev.target.value }))}
-            >
-              <option value="">
-                {selectedEmployee == null
-                  ? 'Сначала выберите сотрудника'
-                  : gradeOptionsLoading
-                    ? 'Загрузка грейдов…'
-                    : eligibleGrades.length === 0
-                      ? 'Нет доступных грейдов'
-                      : 'Выберите грейд'}
-              </option>
-              {eligibleGrades.map((grade) => {
-                const pid = grade.position_id
-                const posLabel =
-                  typeof pid === 'number'
-                    ? positionLabels[pid] || `Должность #${pid}`
-                    : ''
-                const gName = String(grade.name ?? '').trim()
-                const label = posLabel ? `${posLabel}: ${gName}` : gName
-                return (
-                  <option key={grade.id} value={String(grade.id)}>
-                    {label}
-                  </option>
-                )
-              })}
-            </select>
+              onChange={(next) => setCreateForm((prev) => ({ ...prev, targetGradeId: next }))}
+              placeholder={targetGradePlaceholder}
+              disabled={selectedEmployee == null || gradeOptionsLoading || eligibleGrades.length === 0}
+              options={targetGradeOptions}
+            />
             {gradeOptionsMessage ? <p className="entity-zone__idp-muted entity-zone__idp-muted--wrap">{gradeOptionsMessage}</p> : null}
           </label>
           <label className="entity-zone__field">
@@ -530,35 +536,23 @@ export function DevelopmentPlanCreatePage() {
             <div className="entity-zone__filters entity-zone__filters--idp-task-row1">
               <label className="entity-zone__field">
                 <span className="entity-zone__field-label">Тип</span>
-                <select
-                  className="entity-zone__select"
+                <SelectDropdown
                   value={draft.taskType}
-                  onChange={(ev) =>
-                    setTaskDrafts((prev) =>
-                      prev.map((t, i) => (i === index ? { ...t, taskType: ev.target.value } : t)),
-                    )
+                  onChange={(next) =>
+                    setTaskDrafts((prev) => prev.map((t, i) => (i === index ? { ...t, taskType: next } : t)))
                   }
-                >
-                  <option value="LEARNING">Обучение</option>
-                  <option value="PROJECT">Проект</option>
-                  <option value="SOFT_SKILL">Soft skills</option>
-                </select>
+                  options={IDP_TASK_TYPE_OPTIONS}
+                />
               </label>
               <label className="entity-zone__field">
                 <span className="entity-zone__field-label">Приоритет</span>
-                <select
-                  className="entity-zone__select"
+                <SelectDropdown
                   value={draft.taskPriority}
-                  onChange={(ev) =>
-                    setTaskDrafts((prev) =>
-                      prev.map((t, i) => (i === index ? { ...t, taskPriority: ev.target.value } : t)),
-                    )
+                  onChange={(next) =>
+                    setTaskDrafts((prev) => prev.map((t, i) => (i === index ? { ...t, taskPriority: next } : t)))
                   }
-                >
-                  <option value="HIGH">Высокий</option>
-                  <option value="MIDDLE">Средний</option>
-                  <option value="LOW">Низкий</option>
-                </select>
+                  options={IDP_TASK_PRIORITY_OPTIONS}
+                />
               </label>
               <label className="entity-zone__field entity-zone__field--grow">
                 <span className="entity-zone__field-label">Название</span>
