@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, employeesApi, reviewCyclesApi } from '../api/index.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import './pages.css'
@@ -17,18 +17,26 @@ const STATUS_LABEL = {
 }
 
 /**
+ * Дата и время без секунд (дд.мм.гггг, чч:мм).
  * @param {string | null | undefined} iso
  * @returns {string}
  */
-function formatDateTime(iso) {
+function formatDateTimeNoSeconds(iso) {
   if (!iso) {
     return '—'
   }
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) {
-    return iso
+    return String(iso)
   }
-  return d.toLocaleString('ru-RU')
+  return d.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
 }
 
 /**
@@ -49,6 +57,7 @@ function buildEmployeeNameMap(employees) {
 
 export function ReviewsPage() {
   const { companyId } = resolveCompanyId()
+  const navigate = useNavigate()
 
   const [employeeNameLike, setEmployeeNameLike] = useState('')
   const [reviewType, setReviewType] = useState('')
@@ -136,7 +145,7 @@ export function ReviewsPage() {
       </ol>
 
       <h1 className="page__title">Циклы ревью</h1>
-      <p className="page__lead">Плановые и завершённые ревью по сотрудникам.</p>
+      <p className="page__lead">Плановые и завершённые ревью по сотрудникам. Нажмите на карточку, чтобы открыть детали.</p>
 
       {companyId == null ? (
         <div className="entity-zone__error" role="status">
@@ -206,26 +215,49 @@ export function ReviewsPage() {
       ) : null}
 
       {!loading && items && items.length > 0 ? (
-        <div className="entity-zone__grid">
-          {items.map((item) => (
-            <article key={item.review_cycle_id} className="entity-zone__card">
-              <div className="entity-zone__card-name">{REVIEW_TYPE_LABEL[item.review_type] ?? item.review_type}</div>
-              <div className="entity-zone__card-code">
-                {employeeNameMap.get(item.employee_id) ?? 'Сотрудник'}
-              </div>
-              <div className="entity-zone__card-meta">
-                <span className="entity-zone__badge">{STATUS_LABEL[item.status] ?? item.status}</span>
-                <span className="entity-zone__badge">Планов учтено: {item.considered_development_plan_ids.length}</span>
-              </div>
-              <p className="entity-zone__card-desc">
-                Плановая дата: {formatDateTime(item.scheduled_at)}
-                <br />
-                Начато: {formatDateTime(item.started_at)}
-                <br />
-                Завершено: {formatDateTime(item.completed_at)}
-              </p>
-            </article>
-          ))}
+        <div className="entity-zone__grid entity-zone__grid--idp">
+          {items.map((item) => {
+            const employeeName = employeeNameMap.get(item.employee_id) ?? 'Сотрудник'
+            const typeKey = String(item.review_type ?? '').toUpperCase()
+            const typeLabel = REVIEW_TYPE_LABEL[/** @type {keyof typeof REVIEW_TYPE_LABEL} */ (typeKey)] ?? item.review_type
+            const statusKey = String(item.status ?? '').toUpperCase()
+            const statusLabel = STATUS_LABEL[/** @type {keyof typeof STATUS_LABEL} */ (statusKey)] ?? item.status
+            const planCount = (item.considered_development_plan_ids ?? []).length
+            const detailUrl = `/reviews/${item.review_cycle_id}`
+
+            return (
+              <article
+                key={item.review_cycle_id}
+                className="entity-zone__card entity-zone__card--panel entity-zone__card--clickable"
+                role="link"
+                tabIndex={0}
+                aria-label={`Открыть цикл ревью: ${employeeName}`}
+                onClick={() => navigate(detailUrl)}
+                onKeyDown={(ev) => {
+                  if (ev.key === 'Enter' || ev.key === ' ') {
+                    ev.preventDefault()
+                    navigate(detailUrl)
+                  }
+                }}
+              >
+                <div className="entity-zone__card-name">{employeeName}</div>
+                <div className="entity-zone__card-code entity-zone__card-code--status-lg">{typeLabel}</div>
+                <div className="entity-zone__card-meta">
+                  <span className="entity-zone__badge">{statusLabel}</span>
+                  <span className="entity-zone__badge">ИПР в основе: {planCount}</span>
+                </div>
+                <p className="entity-zone__card-desc">
+                  Плановая дата: {formatDateTimeNoSeconds(item.scheduled_at)}
+                </p>
+                <p className="entity-zone__card-desc entity-zone__task-stats">
+                  Начато: {formatDateTimeNoSeconds(item.started_at)}
+                </p>
+                <p className="entity-zone__card-desc entity-zone__task-stats">
+                  Завершено: {formatDateTimeNoSeconds(item.completed_at)}
+                </p>
+              </article>
+            )
+          })}
         </div>
       ) : null}
     </article>

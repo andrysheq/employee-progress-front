@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, employeesApi, promotionDecisionsApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
 import { hasDirectorRole } from '../auth/roleChecks.js'
@@ -27,9 +27,21 @@ function formatDateTime(iso) {
   return d.toLocaleString('ru-RU')
 }
 
+/**
+ * @param {string | null | undefined} text
+ * @param {number} max
+ */
+function truncate(text, max) {
+  if (!text) return ''
+  const t = text.trim()
+  if (t.length <= max) return t
+  return `${t.slice(0, max).trim()}…`
+}
+
 export function PromotionDecisionsPage() {
   const { companyId } = resolveCompanyId()
   const { roles } = useAuth()
+  const navigate = useNavigate()
   const canRead = hasDirectorRole(roles)
 
   const [employees, setEmployees] = useState(
@@ -126,11 +138,11 @@ export function PromotionDecisionsPage() {
         <li>
           <Link to="/">Главная</Link>
         </li>
-        <li>Кадровые решения</li>
+        <li>Решения</li>
       </ol>
 
       <h1 className="page__title">Кадровые решения по повышению</h1>
-      <p className="page__lead">История решений по итогам ревью с фильтрацией по значениям.</p>
+      <p className="page__lead">История решений по итогам ревью. Нажмите на карточку, чтобы открыть детали.</p>
 
       {companyId == null ? (
         <div className="entity-zone__error" role="status">
@@ -201,29 +213,45 @@ export function PromotionDecisionsPage() {
         <p className="entity-zone__empty">Кадровые решения не найдены.</p>
       ) : null}
 
-      {!loading && items && items.length > 0 ? (
-        <div className="entity-zone__grid">
-          {items.map((item) => (
-            <article key={item.decision_id} className="entity-zone__card entity-zone__card--panel">
-              <div className="entity-zone__card-name">
-                {DECISION_LABEL[/** @type {keyof typeof DECISION_LABEL} */ (item.decision)] ?? item.decision}
-              </div>
-              <div className="entity-zone__card-code">{item.employee_name}</div>
-              <div className="entity-zone__card-meta">
-                <span className="entity-zone__badge">
-                  {item.from_grade_code} → {item.to_grade_code ?? '—'}
-                </span>
-              </div>
-              <p className="entity-zone__card-desc">
-                {item.rationale}
-                <br />
-                Принял: {item.decided_by_name} · {formatDateTime(item.decided_at)}
-              </p>
-              {item.improvement_plan_summary ? (
-                <p className="entity-zone__card-desc">План улучшений: {item.improvement_plan_summary}</p>
-              ) : null}
-            </article>
-          ))}
+      {!loading && canRead && items && items.length > 0 ? (
+        <div className="entity-zone__grid entity-zone__grid--idp">
+          {items.map((item) => {
+            const decisionKey = String(item.decision ?? '').toUpperCase()
+            const decisionLabel =
+              DECISION_LABEL[/** @type {keyof typeof DECISION_LABEL} */ (decisionKey)] ?? item.decision
+            const detailUrl = `/promotion-decisions/${item.decision_id}`
+            return (
+              <article
+                key={item.decision_id}
+                className="entity-zone__card entity-zone__card--panel entity-zone__card--clickable"
+                role="link"
+                tabIndex={0}
+                aria-label={`Открыть решение: ${item.employee_name}`}
+                onClick={() => navigate(detailUrl)}
+                onKeyDown={(ev) => {
+                  if (ev.key === 'Enter' || ev.key === ' ') {
+                    ev.preventDefault()
+                    navigate(detailUrl)
+                  }
+                }}
+              >
+                <div className="entity-zone__card-name">{item.employee_name}</div>
+                <div className="entity-zone__card-code entity-zone__card-code--status-lg">{decisionLabel}</div>
+                <div className="entity-zone__card-meta">
+                  <span className="entity-zone__badge">
+                    {item.from_grade_code} → {item.to_grade_code ?? '—'}
+                  </span>
+                </div>
+                <p className="entity-zone__card-desc">{truncate(item.rationale, 180)}</p>
+                <p className="entity-zone__card-desc entity-zone__task-stats">
+                  Принял: {item.decided_by_name} · {formatDateTime(item.decided_at)}
+                </p>
+                {item.improvement_plan_summary ? (
+                  <p className="entity-zone__card-desc">План улучшений: {truncate(item.improvement_plan_summary, 120)}</p>
+                ) : null}
+              </article>
+            )
+          })}
         </div>
       ) : null}
     </article>

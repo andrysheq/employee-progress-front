@@ -31,6 +31,45 @@ function formatDateTime(v) {
 }
 
 /**
+ * @param {Record<string, unknown>} row
+ * @returns {number | null}
+ */
+function rowAuthorEmployeeId(row) {
+  const raw = row.created_by_employee_id ?? row.createdByEmployeeId
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return raw
+  }
+  if (typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw))) {
+    return Number(raw)
+  }
+  return null
+}
+
+/**
+ * @param {Record<string, unknown>} row
+ * @param {Map<number, string>} employeeNameById
+ */
+function formatProgressAuthorLine(row, employeeNameById) {
+  const id = rowAuthorEmployeeId(row)
+  if (id == null) {
+    return 'Автор записи не указан'
+  }
+  return employeeNameById.get(id) ?? `Сотрудник #${id}`
+}
+
+/**
+ * @param {Record<string, unknown>} row
+ * @param {Map<number, string>} employeeNameById
+ */
+function formatCommentAuthorChip(row, employeeNameById) {
+  const id = rowAuthorEmployeeId(row)
+  if (id == null) {
+    return 'Автор не указан'
+  }
+  return employeeNameById.get(id) ?? `Сотрудник #${id}`
+}
+
+/**
  * @param {string} status
  */
 function taskStatusChipClass(status) {
@@ -156,7 +195,7 @@ export function DevelopmentPlanTaskPage() {
                       <span className="entity-zone__idp-chip">{formatDateTime(x.created_at)}</span>
                     </div>
                     <p className="entity-zone__idp-muted">
-                      {employeeNameById.get(x.created_by_employee_id) ?? `Сотрудник #${x.created_by_employee_id}`}
+                      {formatProgressAuthorLine(x, employeeNameById)}
                     </p>
                     {x.comment ? (
                       <p className="entity-zone__idp-muted" style={{ marginTop: '0.35rem' }}>
@@ -180,7 +219,7 @@ export function DevelopmentPlanTaskPage() {
                     <div className="entity-zone__idp-card-head">
                       <span className="entity-zone__idp-chip">{formatDateTime(x.created_at)}</span>
                       <span className="entity-zone__idp-chip">
-                        {employeeNameById.get(x.created_by_employee_id) ?? `#${x.created_by_employee_id}`}
+                        {formatCommentAuthorChip(x, employeeNameById)}
                       </span>
                     </div>
                     <p className="entity-zone__idp-muted" style={{ marginTop: '0.35rem', whiteSpace: 'pre-wrap' }}>

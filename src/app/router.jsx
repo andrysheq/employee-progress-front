@@ -12,7 +12,9 @@ import { DevelopmentPlansPage } from '../pages/DevelopmentPlansPage'
 import { DevelopmentPlanDetailsPage } from '../pages/DevelopmentPlanDetailsPage'
 import { DevelopmentPlanTaskPage } from '../pages/DevelopmentPlanTaskPage'
 import { ReviewsPage } from '../pages/ReviewsPage'
+import { ReviewCycleDetailsPage } from '../pages/ReviewCycleDetailsPage'
 import { PromotionDecisionsPage } from '../pages/PromotionDecisionsPage'
+import { PromotionDecisionDetailsPage } from '../pages/PromotionDecisionDetailsPage'
 import { ReportsPage } from '../pages/ReportsPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
 
@@ -36,7 +38,9 @@ export const router = createBrowserRouter([
       { path: 'development-plans/:planId', element: <DevelopmentPlanDetailsPage /> },
       { path: 'development-plans/:planId/tasks/:taskId', element: <DevelopmentPlanTaskPage /> },
       { path: 'reviews', element: <ReviewsPage /> },
+      { path: 'reviews/:reviewCycleId', element: <ReviewCycleDetailsPage /> },
       { path: 'promotion-decisions', element: <PromotionDecisionsPage /> },
+      { path: 'promotion-decisions/:decisionId', element: <PromotionDecisionDetailsPage /> },
       { path: 'reports', element: <ReportsPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],

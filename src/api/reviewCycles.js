@@ -83,3 +83,37 @@ export async function fetchReviewCyclesRegistry(filter = {}, options = {}) {
   const payload = await apiPost(`/review-cycles/registry${query}`, filter)
   return normalizePage(payload)
 }
+
+/**
+ * @param {number} reviewCycleId
+ * @returns {Promise<ReviewCycleView>}
+ */
+export function fetchReviewCycleById(reviewCycleId) {
+  return /** @type {Promise<ReviewCycleView>} */ (
+    apiGet(`/review-cycles/${Math.trunc(reviewCycleId)}`)
+  )
+}
+
+/**
+ * @typedef {object} InterimReviewAssessmentView
+ * @property {number} assessment_id
+ * @property {number} interim_review_id
+ * @property {number} reviewer_employee_id
+ * @property {string} reviewer_employee_full_name
+ * @property {string} reviewer_role
+ * @property {number | null} [score]
+ * @property {string} recommendation
+ * @property {string | null} [strengths]
+ * @property {string | null} [gaps]
+ * @property {string | null} [comment]
+ */
+
+/**
+ * @param {number} reviewCycleId
+ * @returns {Promise<InterimReviewAssessmentView[]>}
+ */
+export function fetchInterimReviewAssessments(reviewCycleId) {
+  return /** @type {Promise<InterimReviewAssessmentView[]>} */ (
+    apiGet(`/review-cycles/${Math.trunc(reviewCycleId)}/assessments`)
+  )
+}

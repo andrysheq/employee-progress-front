@@ -84,3 +84,13 @@ export async function fetchPromotionDecisionsRegistry(filter = {}, options = {})
   const payload = await apiPost(`/promotion-decisions/registry${query}`, filter)
   return normalizePage(payload)
 }
+
+/**
+ * @param {number} decisionId
+ * @returns {Promise<PromotionDecisionView>}
+ */
+export function fetchPromotionDecisionById(decisionId) {
+  return /** @type {Promise<PromotionDecisionView>} */ (
+    apiGet(`/promotion-decisions/${Math.trunc(decisionId)}`)
+  )
+}
