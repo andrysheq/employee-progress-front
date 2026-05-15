@@ -568,3 +568,20 @@
 .confirm-dialog__button--ghost:hover:not(:disabled) {
   border-color: var(--color-accent);
 }
+
+.entity-zone__grid--employees {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  align-items: stretch;
+}
+
+.entity-zone__grid--employees .entity-zone__card-select {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.entity-zone__grid--employees .entity-zone__card-name {
+  word-break: break-word;
+}
+

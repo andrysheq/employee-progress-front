@@ -6,6 +6,7 @@ import { GradeModelPage } from '../pages/GradeModelPage'
 import { PositionGradesPage } from '../pages/PositionGradesPage'
 import { DepartmentsPage } from '../pages/DepartmentsPage'
 import { EmployeesPage } from '../pages/EmployeesPage'
+import { EmployeeDetailsPage } from '../pages/EmployeeDetailsPage'
 import { PoliciesPage } from '../pages/PoliciesPage'
 import { DevelopmentPlansPage } from '../pages/DevelopmentPlansPage'
 import { ReviewsPage } from '../pages/ReviewsPage'
@@ -27,6 +28,7 @@ export const router = createBrowserRouter([
       { path: 'grade-model/positions/:positionId', element: <PositionGradesPage /> },
       { path: 'departments', element: <DepartmentsPage /> },
       { path: 'employees', element: <EmployeesPage /> },
+      { path: 'employees/:employeeId', element: <EmployeeDetailsPage /> },
       { path: 'policies', element: <PoliciesPage /> },
       { path: 'development-plans', element: <DevelopmentPlansPage /> },
       { path: 'reviews', element: <ReviewsPage /> },
