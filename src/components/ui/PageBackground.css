@@ -1,0 +1,48 @@
+/* Glow backgrounds adapted from 21st.dev-style snippets (Tailwind → plain CSS). */
+
+.page-background-root {
+  position: relative;
+  isolation: isolate;
+  min-height: 100svh;
+  width: 100%;
+  background: #ffffff;
+}
+
+.page-background-root__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.page-background-root__layer {
+  position: absolute;
+  inset: 0;
+}
+
+/* Purple glow — top left, blurred */
+.page-background-root__layer--purple {
+  background-color: #ffffff;
+  background-image: radial-gradient(
+    circle at top left,
+    rgba(173, 109, 244, 0.5),
+    transparent 70%
+  );
+  background-repeat: no-repeat;
+  filter: blur(80px);
+}
+
+/* Soft yellow center — multiply blend */
+.page-background-root__layer--yellow {
+  background-image: radial-gradient(circle at center, #fff991 0%, transparent 70%);
+  opacity: 0.6;
+  mix-blend-mode: multiply;
+}
+
+.page-background-root__content {
+  position: relative;
+  z-index: 1;
+  min-height: 100svh;
+  width: 100%;
+}

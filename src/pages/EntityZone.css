@@ -192,6 +192,18 @@
   outline-offset: 3px;
 }
 
+/* Spotlight cards: без scale — иначе обрезает подсветку при overflow:hidden */
+.entity-zone__grid--idp .grade-matrix-spotlight-card.entity-zone__card--clickable {
+  transition: box-shadow 0.22s ease;
+}
+
+.entity-zone__grid--idp .grade-matrix-spotlight-card.entity-zone__card--clickable:hover {
+  transform: none;
+  box-shadow:
+    0 1.1rem 2.2rem -0.85rem rgb(0 0 0 / 0.38),
+    0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
 .entity-zone__card--selected {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);

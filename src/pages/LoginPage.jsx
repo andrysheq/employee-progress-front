@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { loginWithEmailPassword } from '../api/usersAuth.js'
 import { useAuth } from '../auth/useAuth.js'
+import { PageBackground } from '../components/ui/PageBackground.jsx'
 import './LoginPage.css'
 
 export function LoginPage() {
@@ -38,54 +39,56 @@ export function LoginPage() {
   }
 
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <h1 className="login-card__title">Вход</h1>
-        <p className="login-card__lead">
-          Введите email и пароль от вашей учётной записи.
-        </p>
+    <PageBackground>
+      <div className="login-page">
+        <div className="login-card">
+          <h1 className="login-card__title">Вход</h1>
+          <p className="login-card__lead">
+            Введите email и пароль от вашей учётной записи.
+          </p>
 
-        <form onSubmit={onSubmit}>
-          <div className="login-field">
-            <label htmlFor="login-email">Email</label>
-            <input
-              id="login-email"
-              name="email"
-              type="email"
-              autoComplete="username"
-              value={email}
-              onChange={(ev) => setEmail(ev.target.value)}
-              required
-            />
-          </div>
-          <div className="login-field">
-            <label htmlFor="login-password">Пароль</label>
-            <input
-              id="login-password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(ev) => setPassword(ev.target.value)}
-              required
-            />
-          </div>
+          <form onSubmit={onSubmit}>
+            <div className="login-field">
+              <label htmlFor="login-email">Email</label>
+              <input
+                id="login-email"
+                name="email"
+                type="email"
+                autoComplete="username"
+                value={email}
+                onChange={(ev) => setEmail(ev.target.value)}
+                required
+              />
+            </div>
+            <div className="login-field">
+              <label htmlFor="login-password">Пароль</label>
+              <input
+                id="login-password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(ev) => setPassword(ev.target.value)}
+                required
+              />
+            </div>
 
-          {error ? (
-            <p className="login-card__error" role="alert">
-              {error}
-            </p>
-          ) : null}
+            {error ? (
+              <p className="login-card__error" role="alert">
+                {error}
+              </p>
+            ) : null}
 
-          <button type="submit" className="login-card__submit" disabled={busy}>
-            {busy ? 'Вход…' : 'Войти'}
-          </button>
-        </form>
+            <button type="submit" className="login-card__submit" disabled={busy}>
+              {busy ? 'Вход…' : 'Войти'}
+            </button>
+          </form>
 
-        <p className="login-card__footer">
-          Если у вас нет доступа, обратитесь к администратору системы.
-        </p>
+          <p className="login-card__footer">
+            Если у вас нет доступа, обратитесь к администратору системы.
+          </p>
+        </div>
       </div>
-    </div>
+    </PageBackground>
   )
 }

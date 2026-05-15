@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, gradeModelApi } from '../api/index.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import { ConfirmDialog } from '../components/ConfirmDialog.jsx'
+import { SpotlightCard } from '../components/ui/SpotlightCard.jsx'
 import './pages.css'
 import './EntityZone.css'
 
@@ -421,9 +422,10 @@ export function GradeModelPage() {
             const positionUrl = `/grade-model/positions/${p.id}`
 
             return (
-              <article
+              <SpotlightCard
                 key={p.id}
-                className="entity-zone__card entity-zone__card--panel entity-zone__card--clickable"
+                neutral
+                className="entity-zone__card--clickable grade-matrix-spotlight-card"
                 role="link"
                 tabIndex={0}
                 aria-label={`Открыть грейды должности: ${p.name ?? ''}`}
@@ -485,7 +487,7 @@ export function GradeModelPage() {
                     </span>
                   ) : null}
                 </div>
-              </article>
+              </SpotlightCard>
             )
           })}
         </div>

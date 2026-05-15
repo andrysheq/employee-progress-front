@@ -1,0 +1,146 @@
+/**
+ * Spotlight / glow border card — порт с Tailwind-версии (spotlight-card).
+ * Префикс --sc-* чтобы не пересекаться с другими переменными страницы.
+ */
+
+.spotlight-card {
+  --sc-saturation: 100;
+  --sc-lightness: 70;
+  --sc-lightness-border: 50;
+  --sc-bg-spot-opacity: 0.12;
+  --sc-border-spot-opacity: 1;
+  --sc-border-light-opacity: 1;
+  --sc-border-size: calc(var(--sc-border, 3) * 1px);
+  --sc-spotlight-size: calc(var(--sc-size, 200) * 1px);
+  --sc-x: 0;
+  --sc-y: 0;
+  --sc-xp: 0.5;
+  --sc-yp: 0.5;
+
+  box-sizing: border-box;
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: calc(var(--sc-radius, 14) * 1px);
+  border: var(--sc-border-size) solid var(--sc-backup-border, hsl(0 0% 60% / 0.12));
+
+  background-color: var(--sc-backdrop, hsl(0 0% 60% / 0.12));
+  background-image: radial-gradient(
+    var(--sc-spotlight-size) var(--sc-spotlight-size) at calc(var(--sc-x) * 1px) calc(var(--sc-y) * 1px),
+    hsl(
+        var(--sc-hue, 260) calc(var(--sc-saturation) * 1%) calc(var(--sc-lightness) * 1%) /
+          var(--sc-bg-spot-opacity)
+      ),
+    transparent
+  );
+  background-size: calc(100% + (2 * var(--sc-border-size))) calc(100% + (2 * var(--sc-border-size)));
+  background-position: 50% 50%;
+  background-attachment: fixed;
+
+  box-shadow: 0 1rem 2rem -1rem rgb(0 0 0 / 0.35);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  overflow: hidden;
+}
+
+.spotlight-card::before,
+.spotlight-card::after,
+.spotlight-card__halo::before,
+.spotlight-card__halo::after {
+  pointer-events: none;
+  content: '';
+  position: absolute;
+  inset: calc(var(--sc-border-size) * -1);
+  border: var(--sc-border-size) solid transparent;
+  border-radius: calc(var(--sc-radius, 14) * 1px);
+  background-attachment: fixed;
+  background-size: calc(100% + (2 * var(--sc-border-size))) calc(100% + (2 * var(--sc-border-size)));
+  background-repeat: no-repeat;
+  background-position: 50% 50%;
+  mask-image: linear-gradient(#fff 0 0), linear-gradient(#fff 0 0);
+  mask-clip: padding-box, border-box;
+  mask-composite: intersect;
+  -webkit-mask-image: linear-gradient(#fff 0 0), linear-gradient(#fff 0 0);
+  -webkit-mask-clip: padding-box, border-box;
+  -webkit-mask-composite: source-in;
+}
+
+.spotlight-card::before {
+  background-image: radial-gradient(
+    calc(var(--sc-spotlight-size) * 0.75) calc(var(--sc-spotlight-size) * 0.75) at calc(var(--sc-x) * 1px)
+      calc(var(--sc-y) * 1px),
+    hsl(
+        var(--sc-hue, 260) calc(var(--sc-saturation) * 1%) calc(var(--sc-lightness-border) * 1%) /
+          var(--sc-border-spot-opacity)
+      ),
+    transparent 100%
+  );
+  filter: brightness(2);
+}
+
+.spotlight-card::after {
+  background-image: radial-gradient(
+    calc(var(--sc-spotlight-size) * 0.5) calc(var(--sc-spotlight-size) * 0.5) at calc(var(--sc-x) * 1px)
+      calc(var(--sc-y) * 1px),
+    hsl(0 100% 100% / var(--sc-border-light-opacity)) transparent 100%
+  );
+}
+
+.spotlight-card > .spotlight-card__halo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  will-change: filter;
+  opacity: var(--sc-outer, 1);
+  border-radius: calc(var(--sc-radius, 14) * 1px);
+  filter: blur(calc(var(--sc-border-size) * 10));
+  background: none;
+  pointer-events: none;
+  border: none;
+}
+
+.spotlight-card > .spotlight-card__halo::before {
+  inset: -10px;
+  border-width: 10px;
+}
+
+.spotlight-card > .spotlight-card__halo::after {
+  opacity: 0.85;
+}
+
+.spotlight-card > *:not(.spotlight-card__halo) {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight-card {
+    background-attachment: scroll;
+  }
+
+  .spotlight-card::before,
+  .spotlight-card::after,
+  .spotlight-card__halo::before,
+  .spotlight-card__halo::after {
+    background-attachment: scroll;
+  }
+}
+
+/* Без цветного glow: сохраняем форму карточки и «стекло», убираем радугу и слои обводки */
+.spotlight-card--neutral {
+  border: 1px solid hsl(0 0% 60% / 0.16);
+  background-color: hsl(0 0% 100% / 0.82);
+  background-image: none;
+  background-attachment: scroll;
+}
+
+.spotlight-card--neutral::before,
+.spotlight-card--neutral::after {
+  display: none;
+}
+
+.spotlight-card--neutral .spotlight-card__halo {
+  display: none;
+}
