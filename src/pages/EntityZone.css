@@ -124,27 +124,31 @@
   color: var(--color-text-muted);
 }
 
-.entity-zone__error {
-  padding: 0.875rem 1rem;
-  border-radius: var(--radius-md);
-  border: 1px solid color-mix(in srgb, var(--destructive) 42%, var(--border));
-  background: color-mix(in srgb, var(--destructive) 9%, var(--card));
-  color: color-mix(in srgb, var(--destructive) 88%, var(--foreground));
-  font-size: 0.875rem;
-  margin-bottom: 1rem;
-}
-
-.entity-zone__error code {
-  font-size: 0.75rem;
-  background: transparent;
-  padding: 0;
-  color: inherit;
-}
-
 .entity-zone__loading {
   font-size: 0.875rem;
   color: var(--color-text-muted);
   margin-bottom: 1rem;
+}
+
+/* Плавное обновление списков при смене фильтров (без скачка высоты) */
+.entity-zone__results-surface {
+  transition: opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.entity-zone__results-surface--refreshing {
+  opacity: 0.62;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entity-zone__results-surface,
+  .entity-zone__results-surface--refreshing {
+    transition: none;
+  }
+
+  .entity-zone__results-surface--refreshing {
+    opacity: 0.85;
+  }
 }
 
 .entity-zone__grid {
@@ -173,6 +177,12 @@
   padding: 0.35rem 0.35rem 0.65rem;
   gap: 1.5rem;
   overflow: visible;
+}
+
+/* Реестры внутри results-surface: карточки по левому краю с фильтрами, без горизонтального inset у сетки */
+.entity-zone__results-surface .entity-zone__grid--idp {
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .entity-zone__card--clickable {
@@ -398,6 +408,61 @@
   margin-bottom: 1rem;
 }
 
+.entity-zone__filters .entity-zone__field--datetime-narrow {
+  width: min(14rem, 100%);
+  max-width: 100%;
+  justify-self: start;
+  min-width: 0;
+}
+
+.entity-zone__filters .entity-zone__field--datetime-narrow .entity-zone__input {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.entity-zone__filters .entity-zone__field--date-narrow {
+  width: min(11.5rem, 100%);
+  max-width: 100%;
+  justify-self: start;
+  min-width: 0;
+}
+
+.entity-zone__filters .entity-zone__field--date-narrow .entity-zone__input {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/** Страница «Собеседования»: строка по ширине контента, поле сотрудника без лишнего растягивания */
+.entity-zone__filters.entity-zone__filters--reviews-schedule {
+  grid-template-columns: minmax(12rem, 18rem) auto max-content;
+  width: fit-content;
+  max-width: 100%;
+  align-items: end;
+}
+
+.entity-zone__filters.entity-zone__filters--reviews-filters {
+  grid-template-columns: minmax(12rem, 20rem) minmax(9rem, 14rem) auto auto;
+  width: fit-content;
+  max-width: 100%;
+  align-items: end;
+}
+
+@media (max-width: 720px) {
+  .entity-zone__filters.entity-zone__filters--reviews-schedule {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .entity-zone__filters.entity-zone__filters--reviews-filters {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+}
+
 .entity-zone__filters--row {
   grid-template-columns: minmax(220px, 1fr);
   max-width: 520px;
@@ -414,7 +479,30 @@
 }
 
 .entity-zone__filters--reschedule-row .entity-zone__field {
-  flex: 1 1 180px;
+  margin-bottom: 0;
+}
+
+.entity-zone__filters--reschedule-row .entity-zone__field--grow {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.entity-zone__filters--reschedule-row .entity-zone__field--reschedule-datetime {
+  flex: 0 0 auto;
+  width: 14rem;
+  max-width: min(14rem, 100%);
+}
+
+.entity-zone__filters--reschedule-row .entity-zone__field--reschedule-datetime .entity-zone__input {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.entity-zone__filters--reschedule-row .entity-zone__field--reschedule-submit {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
   margin-bottom: 0;
 }
 
@@ -833,4 +921,168 @@
     grid-template-columns: 1fr;
     gap: 0.2rem;
   }
+}
+
+/* ----- Отчёты: мини-графики ----- */
+.reports-charts-section {
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.reports-charts-section .page__title {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.125rem;
+}
+
+.reports-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.reports-chart {
+  padding: 1rem 1.15rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-muted);
+  background: var(--color-surface-elevated);
+  box-shadow: var(--ui-shadow-xs);
+}
+
+.reports-chart--empty {
+  min-height: 7rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.reports-chart__title {
+  margin: 0 0 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: 0.02em;
+}
+
+.reports-chart__empty {
+  margin: auto 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.reports-chart__stack {
+  margin-bottom: 0.85rem;
+}
+
+.reports-chart__stack-inner {
+  display: flex;
+  height: 1.125rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--muted);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.reports-chart__seg {
+  min-width: 2px;
+  height: 100%;
+  transition: opacity 0.15s ease;
+}
+
+.reports-chart__seg:hover {
+  opacity: 0.88;
+}
+
+.reports-chart__seg--done {
+  background: #22c55e;
+}
+
+.reports-chart__seg--progress {
+  background: #ca8a04;
+}
+
+.reports-chart__seg--planned {
+  background: #94a3b8;
+}
+
+.reports-chart__legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.reports-chart__legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.reports-chart__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.reports-chart__dot--done {
+  background: #22c55e;
+}
+
+.reports-chart__dot--progress {
+  background: #ca8a04;
+}
+
+.reports-chart__dot--planned {
+  background: #94a3b8;
+}
+
+.reports-chart__legend-swatch {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.reports-chart__donut-wrap {
+  position: relative;
+  width: 11rem;
+  height: 11rem;
+  margin: 0 auto 0.85rem;
+}
+
+.reports-chart__donut {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.reports-chart__donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.reports-chart__donut-total {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.1;
+}
+
+.reports-chart__donut-caption {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin-top: 0.1rem;
 }

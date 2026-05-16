@@ -2,6 +2,9 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, departmentsApi, employeesApi } from '../api/index.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { InlineAlert } from '../components/ui/Alert.jsx'
+import { useDisplayWhileRefreshing } from '../hooks/useDisplayWhileRefreshing.js'
+import { cn } from '../lib/utils.js'
 import './pages.css'
 import './EntityZone.css'
 
@@ -75,6 +78,8 @@ export function EmployeesPage() {
     void loadEmployees()
   }, [loadEmployees])
 
+  const { displayData: displayEmployees, showBlockingSpinner, isRefreshing } = useDisplayWhileRefreshing(employees, loading)
+
   return (
     <article className="page">
       <ol className="page__breadcrumbs">
@@ -88,9 +93,9 @@ export function EmployeesPage() {
       <p className="page__lead">Раздел для работы с профилями сотрудников и их карьерным треком.</p>
 
       {companyId == null ? (
-        <div className="entity-zone__error" role="status">
+        <InlineAlert variant="warning" role="status">
           Не удалось определить компанию для загрузки сотрудников. Обновите страницу или войдите заново.
-        </div>
+        </InlineAlert>
       ) : (
         <div className="entity-zone__toolbar">
           <label className="entity-zone__field entity-zone__field--grow">
@@ -106,23 +111,26 @@ export function EmployeesPage() {
         </div>
       )}
 
-      {error ? (
-        <div className="entity-zone__error" role="alert">
-          {error}
-        </div>
-      ) : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
 
-      {loading ? <p className="entity-zone__loading">Загрузка...</p> : null}
+      {showBlockingSpinner ? <p className="entity-zone__loading">Загрузка...</p> : null}
 
-      {!loading && companyId != null && employees && employees.length === 0 ? (
+      {companyId != null && displayEmployees && displayEmployees.length === 0 && !error ? (
         <p className="entity-zone__empty">Сотрудники не найдены.</p>
       ) : null}
 
-      {!loading && employees && employees.length > 0 ? (
+      {displayEmployees && displayEmployees.length > 0 ? (
+        <div
+          className={cn(
+            'entity-zone__results-surface',
+            isRefreshing && 'entity-zone__results-surface--refreshing',
+          )}
+          aria-busy={isRefreshing || undefined}
+        >
         <>
           <p className="entity-zone__muted">Нажмите на карточку, чтобы открыть профиль сотрудника.</p>
           <div className="entity-zone__grid entity-zone__grid--idp entity-zone__grid--employees">
-            {employees.map((employee) => (
+            {displayEmployees.map((employee) => (
               <article
                 key={employee.id}
                 className="entity-zone__card entity-zone__card--panel entity-zone__card--clickable"
@@ -153,6 +161,7 @@ export function EmployeesPage() {
             ))}
           </div>
         </>
+        </div>
       ) : null}
     </article>
   )

@@ -102,6 +102,12 @@
   --page-padding-x: clamp(16px, 4vw, 48px);
   --content-max-width: 1680px;
 
+  /* Полоса прокрутки */
+  --scrollbar-size: 10px;
+  --scrollbar-track: color-mix(in srgb, var(--muted) 42%, var(--background));
+  --scrollbar-thumb: color-mix(in srgb, var(--primary) 30%, var(--border));
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--primary) 50%, var(--border));
+
   /* ----- Compatibility aliases (existing pages / components) ----- */
   --color-bg: var(--background);
   --color-surface: var(--card);
@@ -219,4 +225,8 @@
   --ui-badge-purple-subtle-fg: color-mix(in srgb, var(--foreground) 24%, var(--chart-2));
   --ui-badge-red-subtle-bg: color-mix(in srgb, var(--destructive) 22%, var(--background));
   --ui-badge-red-subtle-fg: color-mix(in srgb, var(--destructive) 78%, var(--foreground));
+
+  --scrollbar-track: color-mix(in srgb, var(--muted) 70%, var(--background));
+  --scrollbar-thumb: color-mix(in srgb, var(--primary) 36%, var(--muted));
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--primary) 55%, var(--muted));
 }

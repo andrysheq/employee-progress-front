@@ -2,6 +2,9 @@
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, departmentsApi, employeesApi } from '../api/index.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { InlineAlert } from '../components/ui/Alert.jsx'
+import { useDisplayWhileRefreshing } from '../hooks/useDisplayWhileRefreshing.js'
+import { cn } from '../lib/utils.js'
 import './pages.css'
 import './EntityZone.css'
 
@@ -13,7 +16,7 @@ export function EmployeeDetailsPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(/** @type {string | null} */ (null))
   const [details, setDetails] = useState(
-    /** @type {{ employee: import('../api/employees.js').EmployeeView, currentGrade: import('../api/employees.js').EmployeeGradeView | null, gradeHistory: import('../api/employees.js').EmployeeGradeView[] } | null} */ (null),
+    /** @type {{ employee: import('../api/employees.js').EmployeeView, currentGrade: import('../api/employees.js').EmployeeGradeView | null, gradeHistory: import('../api/employees.js').EmployeeGradeView[], gradeHistoryForbidden?: boolean } | null} */ (null),
   )
   const [departmentNames, setDepartmentNames] = useState(
     /** @type {Map<number, string>} */ (new Map()),
@@ -29,12 +32,21 @@ export function EmployeeDetailsPage() {
     setLoading(true)
     setError(null)
     try {
-      const [employee, currentGradeResult, gradeHistoryResult, depts] = await Promise.all([
+      const [employee, currentGradeResult, depts] = await Promise.all([
         employeesApi.fetchEmployeeById(employeeId),
         employeesApi.fetchEmployeeCurrentGrade(employeeId).catch(() => null),
-        employeesApi.fetchEmployeeGradeHistory(employeeId).catch(() => []),
         departmentsApi.fetchDepartmentsByCompany(companyId, false).catch(() => []),
       ])
+
+      let gradeHistoryResult = /** @type {import('../api/employees.js').EmployeeGradeView[]} */ ([])
+      let gradeHistoryForbidden = false
+      try {
+        gradeHistoryResult = await employeesApi.fetchEmployeeGradeHistory(employeeId)
+      } catch (e) {
+        if (e instanceof ApiError && e.httpStatus === 403) {
+          gradeHistoryForbidden = true
+        }
+      }
 
       const nextDeptNames = new Map()
       if (Array.isArray(depts)) {
@@ -51,6 +63,7 @@ export function EmployeeDetailsPage() {
         employee,
         currentGrade: currentGradeResult,
         gradeHistory: Array.isArray(gradeHistoryResult) ? gradeHistoryResult : [],
+        gradeHistoryForbidden,
       })
     } catch (e) {
       setDetails(null)
@@ -70,6 +83,8 @@ export function EmployeeDetailsPage() {
     void loadDetails()
   }, [loadDetails])
 
+  const { displayData: displayDetails, showBlockingSpinner, isRefreshing } = useDisplayWhileRefreshing(details, loading)
+
   return (
     <article className="page">
       <ol className="page__breadcrumbs">
@@ -79,79 +94,98 @@ export function EmployeeDetailsPage() {
         <li>
           <Link to="/employees">Сотрудники</Link>
         </li>
-        <li>{details?.employee?.full_name ?? 'Профиль'}</li>
+        <li>{displayDetails?.employee?.full_name ?? details?.employee?.full_name ?? 'Профиль'}</li>
       </ol>
 
       <h1 className="page__title">Профиль сотрудника</h1>
 
-      {error ? (
-        <div className="entity-zone__error" role="alert">
-          {error}
-        </div>
-      ) : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
 
-      {loading ? <p className="entity-zone__loading">Загрузка...</p> : null}
+      {showBlockingSpinner ? <p className="entity-zone__loading">Загрузка...</p> : null}
 
-      {!loading && details ? (
+      {displayDetails ? (
+        <div
+          className={cn(
+            'entity-zone__results-surface',
+            isRefreshing && 'entity-zone__results-surface--refreshing',
+          )}
+          aria-busy={isRefreshing || undefined}
+        >
         <section className="entity-zone__summary">
           <div className="entity-zone__grades-table">
             <div className="entity-zone__grades-row">
               <span>ФИО</span>
-              <span>{details.employee.full_name}</span>
+              <span>{displayDetails.employee.full_name}</span>
               <span />
             </div>
             <div className="entity-zone__grades-row">
               <span>E-mail</span>
-              <span>{details.employee.email}</span>
+              <span>{displayDetails.employee.email}</span>
               <span />
             </div>
             <div className="entity-zone__grades-row">
               <span>Отдел</span>
-              <span>{departmentLabel(departmentNames, details.employee.department_id)}</span>
+              <span>{departmentLabel(departmentNames, displayDetails.employee.department_id)}</span>
               <span />
             </div>
             <div className="entity-zone__grades-row">
               <span>Дата найма</span>
-              <span>{formatDate(details.employee.hired_at)}</span>
+              <span>{formatDate(displayDetails.employee.hired_at)}</span>
+              <span />
+            </div>
+            <div className="entity-zone__grades-row">
+              <span>Оклад (₽/мес.)</span>
+              <span>
+                {displayDetails.employee.current_salary_redacted === true
+                  ? 'Недоступно для сотрудников других отделов'
+                  : displayDetails.employee.current_salary_rub_month != null &&
+                      displayDetails.employee.current_salary_rub_month !== ''
+                    ? Number(displayDetails.employee.current_salary_rub_month).toLocaleString('ru-RU')
+                    : '—'}
+              </span>
               <span />
             </div>
           </div>
 
           <div className="entity-zone__matrix-block">
             <h3 className="entity-zone__matrix-block-title">Текущий грейд</h3>
-            {details.currentGrade ? (
+            {displayDetails.currentGrade ? (
               <div className="entity-zone__grades-table">
                 <div className="entity-zone__grades-row">
                   <span>Грейд</span>
-                  <span>{details.currentGrade.grade_name}</span>
+                  <span>{displayDetails.currentGrade.grade_name}</span>
                   <span />
                 </div>
                 <div className="entity-zone__grades-row">
                   <span>Уровень</span>
-                  <span>{details.currentGrade.grade_level_order}</span>
+                  <span>{displayDetails.currentGrade.grade_level_order}</span>
                   <span />
                 </div>
                 <div className="entity-zone__grades-row">
                   <span>Действует с</span>
-                  <span>{formatDate(details.currentGrade.start_date)}</span>
+                  <span>{formatDate(displayDetails.currentGrade.start_date)}</span>
                   <span />
                 </div>
                 <div className="entity-zone__grades-row">
                   <span>Кто назначил</span>
-                  <span>{details.currentGrade.changed_by_employee_full_name}</span>
+                  <span>{displayDetails.currentGrade.changed_by_employee_full_name}</span>
                   <span />
                 </div>
               </div>
             ) : (
-              <p className="entity-zone__muted">Текущий грейд не найден или недоступен по правам.</p>
+              <p className="entity-zone__muted">Текущий грейд не найден</p>
             )}
           </div>
 
           <div className="entity-zone__matrix-block">
             <h3 className="entity-zone__matrix-block-title">История грейдов</h3>
-            {details.gradeHistory.length > 0 ? (
+            {displayDetails.gradeHistoryForbidden ? (
+              <p className="entity-zone__muted">
+                История грейдов недоступна для сотрудников других отделов.
+              </p>
+            ) : displayDetails.gradeHistory.length > 0 ? (
               <div className="entity-zone__grades-table">
-                {details.gradeHistory.map((row) => (
+                {displayDetails.gradeHistory.map((row) => (
                   <div key={row.employee_grade_id} className="entity-zone__grades-row">
                     <span>{row.grade_name}</span>
                     <span>
@@ -166,6 +200,7 @@ export function EmployeeDetailsPage() {
             )}
           </div>
         </section>
+        </div>
       ) : null}
     </article>
   )

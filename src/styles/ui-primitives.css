@@ -106,6 +106,12 @@ a.entity-zone__button.ui-btn--disabled {
   color: var(--ui-primary-foreground);
 }
 
+.entity-zone__button--align-field {
+  align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
+}
+
 .ui-btn--destructive {
   background: var(--ui-destructive);
   color: var(--ui-destructive-foreground);
@@ -241,7 +247,18 @@ a.entity-zone__button.ui-btn--disabled {
 }
 
 .entity-zone__icon-button--danger {
-  color: var(--ui-destructive);
+  color: var(--muted-foreground);
+}
+
+.entity-zone__icon-button--danger:hover:not(:disabled) {
+  color: var(--foreground);
+}
+
+.entity-zone__icon-button svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  pointer-events: none;
 }
 
 .entity-zone__modal-head .entity-zone__icon-button {

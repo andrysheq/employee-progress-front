@@ -22,6 +22,9 @@ import { buildRegistryQuery, normalizePage } from './registry.js'
  * @property {string | null} [started_at]
  * @property {string | null} [completed_at]
  * @property {number} initiated_by_employee_id
+ * @property {string[]} [policy_advisories]
+ * @property {number | string | null} [weighted_score_advisory]
+ * @property {boolean | null} [policy_compliant]
  */
 
 /**
@@ -135,6 +138,21 @@ export function fetchInterimReviewAssessments(reviewCycleId) {
  */
 
 /**
+ * @param {{ company_id: number, department_id?: number | null }} params
+ * @returns {Promise<number[]>}
+ */
+export function fetchFinalPromotionScheduleEligibleEmployeeIds(params) {
+  const q = new URLSearchParams()
+  q.set('company_id', String(params.company_id))
+  if (params.department_id != null && params.department_id !== '') {
+    q.set('department_id', String(Math.trunc(Number(params.department_id))))
+  }
+  return /** @type {Promise<number[]>} */ (
+    apiGet(`/review-cycles/final-promotion/schedule-eligible-employee-ids?${q.toString()}`)
+  )
+}
+
+/**
  * @param {number} employeeId
  * @param {FinalPromotionReviewScheduleRequest} body
  * @returns {Promise<FinalPromotionReviewScheduleView>}
@@ -152,6 +170,7 @@ export function scheduleFinalPromotionReview(employeeId, body) {
  * @property {number | null | undefined} [target_grade_id]
  * @property {string} rationale
  * @property {string | null | undefined} [improvement_plan_summary]
+ * @property {number | null | undefined} [agreed_salary_rub_month]
  */
 
 /**

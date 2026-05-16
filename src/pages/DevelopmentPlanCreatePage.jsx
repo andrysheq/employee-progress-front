@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { TrashIcon } from '@radix-ui/react-icons'
 import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, departmentsApi, developmentPlansApi, employeesApi, gradeModelApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
@@ -6,6 +7,7 @@ import { hasTeamLeadRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import { idpTaskDraftToApiPayload, newIdpTaskDraft } from '../utils/idpTaskDraft.js'
 import { IDP_TASK_PRIORITY_OPTIONS, IDP_TASK_TYPE_OPTIONS } from '../utils/idpSelectOptions.js'
+import { InlineAlert } from '../components/ui/Alert.jsx'
 import { SelectDropdown } from '../components/ui/SelectDropdown.jsx'
 import './pages.css'
 import './EntityZone.css'
@@ -507,7 +509,11 @@ export function DevelopmentPlanCreatePage() {
               disabled={selectedEmployee == null || gradeOptionsLoading || eligibleGrades.length === 0}
               options={targetGradeOptions}
             />
-            {gradeOptionsMessage ? <p className="entity-zone__idp-muted entity-zone__idp-muted--wrap">{gradeOptionsMessage}</p> : null}
+            {gradeOptionsMessage ? (
+              <InlineAlert variant="warning" role="status" className="ui-alert--field-hint">
+                {gradeOptionsMessage}
+              </InlineAlert>
+            ) : null}
           </label>
           <label className="entity-zone__field">
             <span className="entity-zone__field-label">Период с</span>
@@ -638,10 +644,12 @@ export function DevelopmentPlanCreatePage() {
               <div className="entity-zone__actions">
                 <button
                   type="button"
-                  className="entity-zone__button"
+                  className="entity-zone__icon-button entity-zone__icon-button--danger"
+                  title="Удалить задачу"
+                  aria-label="Удалить задачу"
                   onClick={() => setTaskDrafts((prev) => prev.filter((_, i) => i !== index))}
                 >
-                  Удалить задачу
+                  <TrashIcon aria-hidden />
                 </button>
               </div>
             ) : null}
@@ -674,23 +682,11 @@ export function DevelopmentPlanCreatePage() {
         </div>
       </section>
 
-      {matrixLookupError ? (
-        <div className="entity-zone__error" role="alert">
-          {matrixLookupError}
-        </div>
-      ) : null}
+      {matrixLookupError ? <InlineAlert variant="error">{matrixLookupError}</InlineAlert> : null}
 
-      {departmentContextError ? (
-        <div className="entity-zone__error" role="alert">
-          {departmentContextError}
-        </div>
-      ) : null}
+      {departmentContextError ? <InlineAlert variant="error">{departmentContextError}</InlineAlert> : null}
 
-      {submitError ? (
-        <div className="entity-zone__error" role="alert">
-          {submitError}
-        </div>
-      ) : null}
+      {submitError ? <InlineAlert variant="error">{submitError}</InlineAlert> : null}
     </article>
   )
 }

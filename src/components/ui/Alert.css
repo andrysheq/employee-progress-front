@@ -1,0 +1,157 @@
+/* Алерт в духе shadcn — палитра из tokens (--chart-*, --destructive, --muted, …) */
+
+.ui-alert {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 1fr;
+  column-gap: 0.5rem;
+  row-gap: 0.125rem;
+  align-items: start;
+  width: 100%;
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--ui-radius-xl);
+  font-size: 0.875rem;
+  line-height: 1.35;
+  border: 1px solid transparent;
+  margin-bottom: 1rem;
+}
+
+.ui-alert:has(> .ui-alert__icon) {
+  grid-template-columns: 1rem 1fr;
+}
+
+.ui-alert__icon {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  margin-top: 0.08em;
+  color: var(--alert-icon, var(--muted-foreground));
+}
+
+.ui-alert:not(:has(> .ui-alert__icon)) .ui-alert__title,
+.ui-alert:not(:has(> .ui-alert__icon)) .ui-alert__description,
+.ui-alert:not(:has(> .ui-alert__icon)) .ui-alert__action {
+  grid-column: 1;
+}
+
+.ui-alert:has(> .ui-alert__icon) .ui-alert__title,
+.ui-alert:has(> .ui-alert__icon) .ui-alert__description {
+  grid-column: 2;
+}
+
+.ui-alert__title {
+  font-weight: 600;
+  color: var(--alert-title, inherit);
+}
+
+.ui-alert__description {
+  color: var(--alert-description, var(--muted-foreground));
+}
+
+.ui-alert__description > * + * {
+  margin-top: 0.35rem;
+}
+
+.ui-alert__action {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.ui-alert:has(> .ui-alert__icon) .ui-alert__action {
+  grid-column: 2;
+  margin-top: 0.35rem;
+}
+
+.ui-alert code {
+  font-size: 0.75rem;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+/* ----- Variants (семантика + фирменные оттенки) ----- */
+
+.ui-alert--default {
+  --alert-icon: var(--muted-foreground);
+  --alert-title: var(--foreground);
+  --alert-description: var(--muted-foreground);
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--muted) 32%, var(--background));
+  color: var(--foreground);
+}
+
+.ui-alert--error {
+  --alert-icon: color-mix(in srgb, var(--destructive) 82%, var(--foreground));
+  --alert-title: color-mix(in srgb, var(--destructive) 72%, var(--foreground));
+  --alert-description: color-mix(in srgb, var(--destructive) 38%, var(--muted-foreground));
+  border-color: color-mix(in srgb, var(--destructive) 38%, var(--border));
+  background: color-mix(in srgb, var(--destructive) 9%, var(--card));
+  color: color-mix(in srgb, var(--destructive) 88%, var(--foreground));
+}
+
+.ui-alert--warning {
+  --alert-icon: color-mix(in srgb, var(--chart-4) 88%, var(--foreground));
+  --alert-title: color-mix(in srgb, var(--chart-4) 55%, var(--foreground));
+  --alert-description: color-mix(in srgb, var(--chart-4) 32%, var(--muted-foreground));
+  border-color: color-mix(in srgb, var(--chart-4) 38%, var(--border));
+  background: color-mix(in srgb, var(--chart-4) 10%, var(--card));
+  color: color-mix(in srgb, var(--chart-4) 72%, var(--foreground));
+}
+
+.ui-alert--info {
+  --alert-icon: color-mix(in srgb, var(--chart-5) 88%, var(--foreground));
+  --alert-title: color-mix(in srgb, var(--chart-5) 52%, var(--foreground));
+  --alert-description: color-mix(in srgb, var(--chart-5) 30%, var(--muted-foreground));
+  border-color: color-mix(in srgb, var(--chart-5) 38%, var(--border));
+  background: color-mix(in srgb, var(--chart-5) 9%, var(--card));
+  color: color-mix(in srgb, var(--chart-5) 68%, var(--foreground));
+}
+
+.ui-alert--success {
+  --alert-icon: color-mix(in srgb, var(--chart-3) 88%, var(--foreground));
+  --alert-title: color-mix(in srgb, var(--chart-3) 48%, var(--foreground));
+  --alert-description: color-mix(in srgb, var(--chart-3) 28%, var(--muted-foreground));
+  border-color: color-mix(in srgb, var(--chart-3) 36%, var(--border));
+  background: color-mix(in srgb, var(--chart-3) 9%, var(--card));
+  color: color-mix(in srgb, var(--chart-3) 62%, var(--foreground));
+}
+
+/* ----- Spacing modifiers (замена inline style) ----- */
+
+.ui-alert--mb-0 {
+  margin-bottom: 0;
+}
+
+.ui-alert--mb-sm {
+  margin-bottom: 0.75rem;
+}
+
+.ui-alert--mb-lg {
+  margin-bottom: 1rem;
+}
+
+.ui-alert--mt-xs {
+  margin-top: 0.35rem;
+}
+
+.ui-alert--mt-sm {
+  margin-top: 0.5rem;
+}
+
+/* Компактный блок под полем (подсказки / предупреждения) */
+.ui-alert--field-hint {
+  margin-top: 0.35rem;
+  margin-bottom: 0;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.8125rem;
+}
+
+/* Карточка входа: на всю ширину формы */
+.ui-alert--login {
+  margin: 0 0 1rem;
+}

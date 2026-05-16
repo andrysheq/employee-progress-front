@@ -1,3 +1,5 @@
+export { Alert, AlertAction, AlertDescription, AlertTitle, AlertVariantIcon, InlineAlert } from './Alert.jsx'
+export { alertVariants } from './alert-variants.js'
 export { Button } from './Button.jsx'
 export { buttonVariants } from './button-variants.js'
 export { Badge } from './Badge.jsx'

@@ -74,6 +74,7 @@ import { apiGet } from './client.js'
  * @property {'APPROVED' | 'REJECTED' | string} decision
  * @property {string} rationale
  * @property {string | null} [improvement_plan_summary]
+ * @property {number | null} [agreed_salary_rub_month]
  */
 
 /**

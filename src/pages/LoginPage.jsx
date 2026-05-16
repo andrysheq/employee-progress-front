@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { loginWithEmailPassword } from '../api/usersAuth.js'
 import { useAuth } from '../auth/useAuth.js'
+import { InlineAlert } from '../components/ui/Alert.jsx'
 import { PageBackground } from '../components/ui/PageBackground.jsx'
 import './LoginPage.css'
 
@@ -74,9 +75,9 @@ export function LoginPage() {
             </div>
 
             {error ? (
-              <p className="login-card__error" role="alert">
+              <InlineAlert variant="error" className="ui-alert--login">
                 {error}
-              </p>
+              </InlineAlert>
             ) : null}
 
             <button type="submit" className="login-card__submit" disabled={busy}>

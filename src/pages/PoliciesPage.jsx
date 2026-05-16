@@ -4,7 +4,10 @@ import { ApiError, promotionPoliciesApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
 import { hasDirectorRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { InlineAlert } from '../components/ui/Alert.jsx'
 import { SelectDropdown } from '../components/ui/SelectDropdown.jsx'
+import { useDisplayWhileRefreshing } from '../hooks/useDisplayWhileRefreshing.js'
+import { cn } from '../lib/utils.js'
 import './pages.css'
 import './EntityZone.css'
 
@@ -154,6 +157,8 @@ export function PoliciesPage() {
     [canManage, load, submitting],
   )
 
+  const { displayData: displayPolicies, showBlockingSpinner, isRefreshing } = useDisplayWhileRefreshing(policies, loading)
+
   return (
     <article className="page">
       <ol className="page__breadcrumbs">
@@ -167,9 +172,9 @@ export function PoliciesPage() {
       <p className="page__lead">Правила, по которым оценивается готовность к повышению.</p>
 
       {companyId == null ? (
-        <div className="entity-zone__error" role="status">
+        <InlineAlert variant="warning" role="status">
           Не удалось определить компанию для загрузки политик. Обновите страницу или войдите заново.
-        </div>
+        </InlineAlert>
       ) : (
         <form
           className="entity-zone__filters"
@@ -317,27 +322,26 @@ export function PoliciesPage() {
         </section>
       ) : null}
 
-      {submitError ? (
-        <div className="entity-zone__error" role="alert">
-          {submitError}
-        </div>
-      ) : null}
+      {submitError ? <InlineAlert variant="error">{submitError}</InlineAlert> : null}
 
-      {error ? (
-        <div className="entity-zone__error" role="alert">
-          {error}
-        </div>
-      ) : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
 
-      {loading ? <p className="entity-zone__loading">Загрузка…</p> : null}
+      {showBlockingSpinner ? <p className="entity-zone__loading">Загрузка…</p> : null}
 
-      {!loading && companyId != null && policies && policies.length === 0 && !error ? (
+      {companyId != null && displayPolicies && displayPolicies.length === 0 && !error ? (
         <p className="entity-zone__empty">Политики не найдены.</p>
       ) : null}
 
-      {!loading && policies && policies.length > 0 ? (
-        <div className="entity-zone__grid entity-zone__grid--idp">
-          {policies.map((pol) => (
+      {displayPolicies && displayPolicies.length > 0 ? (
+        <div
+          className={cn(
+            'entity-zone__results-surface',
+            isRefreshing && 'entity-zone__results-surface--refreshing',
+          )}
+          aria-busy={isRefreshing || undefined}
+        >
+          <div className="entity-zone__grid entity-zone__grid--idp">
+          {displayPolicies.map((pol) => (
             <article key={pol.id} className="entity-zone__card entity-zone__card--panel">
               <div className="entity-zone__card-name">{pol.name}</div>
               <div className="entity-zone__card-meta">
@@ -389,6 +393,7 @@ export function PoliciesPage() {
               ) : null}
             </article>
           ))}
+          </div>
         </div>
       ) : null}
     </article>

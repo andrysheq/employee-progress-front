@@ -89,7 +89,8 @@
 .ui-select-dropdown__menu-portal {
   box-sizing: border-box;
   margin: 0;
-  padding: 0.35rem;
+  /* чуть больше сверху — первый пункт не прилипает к верхней границе панели */
+  padding: 0.5rem 0.35rem 0.35rem;
   list-style: none;
   border-radius: var(--ui-radius-xl);
   border: 1px solid var(--border);
@@ -136,10 +137,6 @@
   text-align: left;
   cursor: pointer;
   transition: background-color 0.15s ease;
-}
-
-.ui-select-dropdown__option + .ui-select-dropdown__option {
-  margin-top: 0.1rem;
 }
 
 .ui-select-dropdown__option:hover:not(:disabled) {

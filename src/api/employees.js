@@ -10,6 +10,8 @@ import { buildRegistryQuery, normalizePage } from './registry.js'
  * @property {string} full_name
  * @property {boolean} is_active
  * @property {string | null} [hired_at]
+ * @property {number | null} [current_salary_rub_month]
+ * @property {boolean | null} [current_salary_redacted]
  */
 
 /**

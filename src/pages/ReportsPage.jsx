@@ -4,6 +4,10 @@ import { ApiError, reportsApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
 import { hasDirectorRole, hasTeamLeadRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { InlineAlert } from '../components/ui/Alert.jsx'
+import { useDisplayWhileRefreshing } from '../hooks/useDisplayWhileRefreshing.js'
+import { cn } from '../lib/utils.js'
+import { ReportPlansPipelineDonut, ReportPromotionDonut, ReportTasksStackedBar } from '../components/reports/ReportCharts.jsx'
 import './pages.css'
 import './EntityZone.css'
 
@@ -175,6 +179,15 @@ export function ReportsPage() {
     void load()
   }, [load])
 
+  const displayBundle = useMemo(
+    () => ({ completion, effectiveness, history }),
+    [completion, effectiveness, history],
+  )
+  const { displayData: disp, showBlockingSpinner, isRefreshing } = useDisplayWhileRefreshing(displayBundle, loading)
+  const dEff = disp?.effectiveness ?? null
+  const dComp = disp?.completion ?? null
+  const dHist = disp?.history ?? null
+
   return (
     <article className="page">
       <ol className="page__breadcrumbs">
@@ -188,9 +201,9 @@ export function ReportsPage() {
       <p className="page__lead">Сводные показатели по выполнению ИПР, эффективности и кадровым решениям.</p>
 
       {companyId == null ? (
-        <div className="entity-zone__error" role="status">
+        <InlineAlert variant="warning" role="status">
           Не удалось определить компанию для загрузки отчётов.
-        </div>
+        </InlineAlert>
       ) : null}
 
       <form
@@ -216,142 +229,171 @@ export function ReportsPage() {
         </button>
       </div>
 
-      {error ? (
-        <div className="entity-zone__error" role="alert">
-          {error}
-        </div>
-      ) : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
 
-      {loading ? <p className="entity-zone__loading">Загрузка…</p> : null}
+      {showBlockingSpinner ? <p className="entity-zone__loading">Загрузка…</p> : null}
 
-      {!loading && effectivenessError ? (
+      <div
+        className={cn(
+          'entity-zone__results-surface',
+          isRefreshing && 'entity-zone__results-surface--refreshing',
+        )}
+        aria-busy={isRefreshing || undefined}
+      >
+      {effectivenessError ? (
         <p className="entity-zone__section-error" role="status">
           Сводка эффективности: {effectivenessError}
         </p>
       ) : null}
 
-      {!loading && effectiveness ? (
+      {dEff ? (
         <>
           <h2 className="page__title">Сводка эффективности</h2>
           <div className="entity-zone__metrics">
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">ИПР в срезе</div>
-              <div className="entity-zone__metric-value">{effectiveness.plans_total}</div>
+              <div className="entity-zone__metric-value">{dEff.plans_total}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Активных ИПР</div>
-              <div className="entity-zone__metric-value">{effectiveness.plans_active}</div>
+              <div className="entity-zone__metric-value">{dEff.plans_active}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Завершённых ИПР</div>
-              <div className="entity-zone__metric-value">{effectiveness.plans_completed}</div>
+              <div className="entity-zone__metric-value">{dEff.plans_completed}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Среднее выполнение</div>
-              <div className="entity-zone__metric-value">{asPercent(effectiveness.avg_plan_completion_percent)}</div>
+              <div className="entity-zone__metric-value">{asPercent(dEff.avg_plan_completion_percent)}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Доля задач в срок</div>
-              <div className="entity-zone__metric-value">{asPercent(effectiveness.on_time_done_tasks_share_percent)}</div>
+              <div className="entity-zone__metric-value">{asPercent(dEff.on_time_done_tasks_share_percent)}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Средняя длительность задачи</div>
               <div className="entity-zone__metric-value">
-                {Number.isFinite(Number(effectiveness.avg_task_completion_duration_days))
-                  ? `${Number(effectiveness.avg_task_completion_duration_days).toFixed(1)} дн.`
+                {Number.isFinite(Number(dEff.avg_task_completion_duration_days))
+                  ? `${Number(dEff.avg_task_completion_duration_days).toFixed(1)} дн.`
                   : '—'}
               </div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Итоговых ревью</div>
-              <div className="entity-zone__metric-value">{effectiveness.final_reviews_total}</div>
+              <div className="entity-zone__metric-value">{dEff.final_reviews_total}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Повышения одобрено</div>
-              <div className="entity-zone__metric-value">{effectiveness.promotion_approved_total}</div>
+              <div className="entity-zone__metric-value">{dEff.promotion_approved_total}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Повышения отклонено</div>
-              <div className="entity-zone__metric-value">{effectiveness.promotion_rejected_total}</div>
+              <div className="entity-zone__metric-value">{dEff.promotion_rejected_total}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Конверсия в повышение</div>
-              <div className="entity-zone__metric-value">{asPercent(effectiveness.promotion_conversion_percent)}</div>
+              <div className="entity-zone__metric-value">{asPercent(dEff.promotion_conversion_percent)}</div>
             </article>
           </div>
         </>
       ) : null}
 
-      {!loading && completionError ? (
+      {completionError ? (
         <p className="entity-zone__section-error" role="status">
           Выполнение ИПР: {completionError}
         </p>
       ) : null}
 
-      {!loading && completion ? (
+      {dComp ? (
         <>
           <h2 className="page__title">Выполнение ИПР</h2>
           <div className="entity-zone__metrics">
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Всего ИПР</div>
-              <div className="entity-zone__metric-value">{completion.plans_total}</div>
+              <div className="entity-zone__metric-value">{dComp.plans_total}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Всего задач</div>
-              <div className="entity-zone__metric-value">{completion.tasks_total}</div>
+              <div className="entity-zone__metric-value">{dComp.tasks_total}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Выполнено задач</div>
-              <div className="entity-zone__metric-value">{completion.tasks_done}</div>
+              <div className="entity-zone__metric-value">{dComp.tasks_done}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">В работе</div>
-              <div className="entity-zone__metric-value">{completion.tasks_in_progress}</div>
+              <div className="entity-zone__metric-value">{dComp.tasks_in_progress}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Запланировано</div>
-              <div className="entity-zone__metric-value">{completion.tasks_planned}</div>
+              <div className="entity-zone__metric-value">{dComp.tasks_planned}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Среднее выполнение ИПР</div>
-              <div className="entity-zone__metric-value">{asPercent(completion.avg_plan_completion_percent)}</div>
+              <div className="entity-zone__metric-value">{asPercent(dComp.avg_plan_completion_percent)}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Доля задач в срок</div>
-              <div className="entity-zone__metric-value">{asPercent(completion.on_time_done_tasks_share_percent)}</div>
+              <div className="entity-zone__metric-value">{asPercent(dComp.on_time_done_tasks_share_percent)}</div>
             </article>
           </div>
         </>
       ) : null}
 
-      {!loading && historyError ? (
+      {historyError ? (
         <p className="entity-zone__section-error" role="status">
           История кадровых решений: {historyError}
         </p>
       ) : null}
 
-      {!loading && history ? (
+      {dHist ? (
         <>
           <h2 className="page__title">История кадровых решений</h2>
           <div className="entity-zone__metrics">
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Всего решений</div>
-              <div className="entity-zone__metric-value">{history.decisions_total}</div>
+              <div className="entity-zone__metric-value">{dHist.decisions_total}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Одобрено</div>
-              <div className="entity-zone__metric-value">{history.approved_total}</div>
+              <div className="entity-zone__metric-value">{dHist.approved_total}</div>
             </article>
             <article className="entity-zone__metric">
               <div className="entity-zone__metric-label">Отклонено</div>
-              <div className="entity-zone__metric-value">{history.rejected_total}</div>
+              <div className="entity-zone__metric-value">{dHist.rejected_total}</div>
             </article>
           </div>
-          {history.decisions_total === 0 ? (
+          {dHist.decisions_total === 0 ? (
             <p className="entity-zone__empty">История решений за период пуста.</p>
           ) : null}
         </>
       ) : null}
+
+      {((canReadPerformance && (dComp || dEff)) || (canReadHistory && dHist && dHist.decisions_total > 0)) ? (
+        <section className="reports-charts-section" aria-labelledby="reports-charts-heading">
+          <h2 id="reports-charts-heading" className="page__title">
+            Графики
+          </h2>
+          <p className="entity-zone__idp-muted" style={{ marginTop: '-0.5rem', marginBottom: '1rem' }}>
+            Краткая визуализация по загруженным отчётам за выбранный период.
+          </p>
+          <div className="reports-charts-grid">
+            {canReadPerformance && dComp ? (
+              <ReportTasksStackedBar
+                done={dComp.tasks_done}
+                inProgress={dComp.tasks_in_progress}
+                planned={dComp.tasks_planned}
+              />
+            ) : null}
+            {canReadHistory && dHist && dHist.decisions_total > 0 ? (
+              <ReportPromotionDonut history={dHist} />
+            ) : canReadPerformance && dEff && dEff.plans_total > 0 ? (
+              <ReportPlansPipelineDonut eff={dEff} />
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+      </div>
     </article>
   )
 }

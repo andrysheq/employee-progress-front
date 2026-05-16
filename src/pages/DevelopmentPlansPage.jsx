@@ -4,7 +4,10 @@ import { ApiError, developmentPlansApi, employeesApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
 import { hasTeamLeadRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { InlineAlert } from '../components/ui/Alert.jsx'
 import { SelectDropdown } from '../components/ui/SelectDropdown.jsx'
+import { useDisplayWhileRefreshing } from '../hooks/useDisplayWhileRefreshing.js'
+import { cn } from '../lib/utils.js'
 import './pages.css'
 import './EntityZone.css'
 
@@ -165,6 +168,8 @@ export function DevelopmentPlansPage() {
 
   const employeeNameMap = useMemo(() => buildEmployeeNameMap(employees), [employees])
 
+  const { displayData: displayPlans, showBlockingSpinner, isRefreshing } = useDisplayWhileRefreshing(plans, loading)
+
   return (
     <article className="page">
       <ol className="page__breadcrumbs">
@@ -232,27 +237,26 @@ export function DevelopmentPlansPage() {
         ) : null}
       </div>
 
-      {lookupError ? (
-        <div className="entity-zone__error" role="alert">
-          {lookupError}
-        </div>
-      ) : null}
+      {lookupError ? <InlineAlert variant="error">{lookupError}</InlineAlert> : null}
 
-      {error ? (
-        <div className="entity-zone__error" role="alert">
-          {error}
-        </div>
-      ) : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
 
-      {loading ? <p className="entity-zone__loading">Загрузка…</p> : null}
+      {showBlockingSpinner ? <p className="entity-zone__loading">Загрузка…</p> : null}
 
-      {!loading && plans && plans.length === 0 && !error ? (
+      {companyId != null && displayPlans && displayPlans.length === 0 && !error ? (
         <p className="entity-zone__empty">ИПР по текущим фильтрам не найдены.</p>
       ) : null}
 
-            {!loading && plans && plans.length > 0 ? (
-        <div className="entity-zone__grid entity-zone__grid--idp">
-          {plans.map((plan) => {
+      {displayPlans && displayPlans.length > 0 ? (
+        <div
+          className={cn(
+            'entity-zone__results-surface',
+            isRefreshing && 'entity-zone__results-surface--refreshing',
+          )}
+          aria-busy={isRefreshing || undefined}
+        >
+          <div className="entity-zone__grid entity-zone__grid--idp">
+          {displayPlans.map((plan) => {
             const tasks = Array.isArray(plan.tasks) ? plan.tasks : []
             const counts = taskStatusCounts(tasks)
             const competencyItems = Array.isArray(plan.competency_items) ? plan.competency_items : []
@@ -310,6 +314,7 @@ export function DevelopmentPlansPage() {
               </article>
             )
           })}
+          </div>
         </div>
       ) : null}
     </article>

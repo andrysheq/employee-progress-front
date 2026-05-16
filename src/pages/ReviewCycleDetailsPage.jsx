@@ -5,6 +5,7 @@ import { useAuth } from '../auth/useAuth.js'
 import { hasDirectorRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
+import { InlineAlert } from '../components/ui/Alert.jsx'
 import { SelectDropdown } from '../components/ui/SelectDropdown.jsx'
 import './pages.css'
 import './EntityZone.css'
@@ -49,6 +50,69 @@ function reviewStatusChipClass(status) {
   return 'entity-zone__idp-chip entity-zone__idp-chip--status-planned'
 }
 
+/**
+ * @param {unknown} raw
+ * @returns {string | null}
+ */
+function formatWeightedAdvisoryScoreDisplay(raw) {
+  if (raw == null || raw === '') {
+    return null
+  }
+  const n = Number(raw)
+  if (!Number.isFinite(n)) {
+    return null
+  }
+  return n.toFixed(2).replace('.', ',')
+}
+
+/**
+ * @param {unknown} amount
+ */
+function formatRubAmount(amount) {
+  if (amount == null || amount === '') {
+    return null
+  }
+  const n = Math.trunc(Number(amount))
+  if (!Number.isFinite(n)) {
+    return null
+  }
+  return `${n.toLocaleString('ru-RU')} ₽`
+}
+
+/**
+ * @param {import('../api/gradeModel.js').GradeView | null | undefined} g
+ */
+function salaryForkCaption(g) {
+  if (!g) {
+    return '—'
+  }
+  const min = g.salary_min_amount
+  const max = g.salary_max_amount
+  if (min == null && max == null) {
+    return 'вилка не задана в матрице грейдов'
+  }
+  if (min != null && max != null) {
+    return `${formatRubAmount(min)} — ${formatRubAmount(max)}`
+  }
+  if (min != null) {
+    return `от ${formatRubAmount(min)}`
+  }
+  return `до ${formatRubAmount(max)}`
+}
+
+/**
+ * @param {import('../api/employees.js').EmployeeView | null | undefined} emp
+ */
+function formatEmployeeCurrentSalaryDisplay(emp) {
+  if (!emp) {
+    return 'не зафиксирован'
+  }
+  if (emp.current_salary_redacted === true) {
+    return 'недоступен (другой отдел)'
+  }
+  return formatRubAmount(emp.current_salary_rub_month) ?? 'не зафиксирован'
+}
+
 export function ReviewCycleDetailsPage() {
   const { reviewCycleId } = useParams()
   const { companyId } = resolveCompanyId()
@@ -70,17 +134,59 @@ export function ReviewCycleDetailsPage() {
   const [gradeOptionsLoading, setGradeOptionsLoading] = useState(false)
   const [gradeOptionsMessage, setGradeOptionsMessage] = useState(/** @type {string | null} */ (null))
 
-  const [activeAction, setActiveAction] = useState(/** @type {'reschedule' | 'approve' | 'reject' | null} */ (null))
+  const [activeAction, setActiveAction] = useState(/** @type {'reschedule' | null} */ (null))
   const [targetGradeId, setTargetGradeId] = useState('')
   const [rationale, setRationale] = useState('')
   const [improvementPlanSummary, setImprovementPlanSummary] = useState('')
   const [rescheduleAt, setRescheduleAt] = useState('')
   const [rescheduleComment, setRescheduleComment] = useState('')
 
+  const [subjectEmployee, setSubjectEmployee] = useState(
+    /** @type {import('../api/employees.js').EmployeeView | null} */ (null),
+  )
+  const [directorModal, setDirectorModal] = useState(/** @type {'approve' | 'reject' | null} */ (null))
+  const [modalSalaryRub, setModalSalaryRub] = useState('')
+  const [modalError, setModalError] = useState(/** @type {string | null} */ (null))
+
   const [actionBusy, setActionBusy] = useState(false)
   const [actionError, setActionError] = useState(/** @type {string | null} */ (null))
   const [actionInfo, setActionInfo] = useState(/** @type {string | null} */ (null))
-  const [policyAdvisories, setPolicyAdvisories] = useState(/** @type {string[] | null} */ (null))
+  /** Снимок ответа POST решения; приоритетнее полей GET карточки до перезагрузки. */
+  const [promotionDecisionAdvisory, setPromotionDecisionAdvisory] = useState(
+    /** @type {{ weightedScoreAdvisory: number | null, policyCompliant: boolean, policyAdvisories: string[] } | null} */ (null),
+  )
+
+  const policyPreview = useMemo(() => {
+    if (promotionDecisionAdvisory) {
+      return promotionDecisionAdvisory
+    }
+    if (!cycle) {
+      return null
+    }
+    const adv = Array.isArray(cycle.policy_advisories) ? cycle.policy_advisories : []
+    const wRaw = cycle.weighted_score_advisory
+    let weightedNum = null
+    if (wRaw != null && wRaw !== '') {
+      const n = Number(wRaw)
+      if (Number.isFinite(n)) {
+        weightedNum = n
+      }
+    }
+    const compliant = cycle.policy_compliant
+    const hasFromDetailGet =
+      compliant === true ||
+      compliant === false ||
+      adv.length > 0 ||
+      weightedNum != null
+    if (!hasFromDetailGet) {
+      return null
+    }
+    return {
+      weightedScoreAdvisory: weightedNum,
+      policyCompliant: compliant === true,
+      policyAdvisories: adv,
+    }
+  }, [promotionDecisionAdvisory, cycle])
 
   const reloadCycle = useCallback(async () => {
     const id = Number(reviewCycleId)
@@ -90,6 +196,12 @@ export function ReviewCycleDetailsPage() {
     const data = await reviewCyclesApi.fetchReviewCycleById(id)
     setCycle(data)
     setRescheduleAt(toDatetimeLocalValue(data.scheduled_at))
+    try {
+      const e = await employeesApi.fetchEmployeeById(data.employee_id)
+      setSubjectEmployee(e)
+    } catch {
+      setSubjectEmployee(null)
+    }
   }, [reviewCycleId])
 
   useEffect(() => {
@@ -104,6 +216,7 @@ export function ReviewCycleDetailsPage() {
       }
       setLoading(true)
       setError(null)
+      setPromotionDecisionAdvisory(null)
       try {
         const [data, employeesPage, history] = await Promise.all([
           reviewCyclesApi.fetchReviewCycleById(id),
@@ -117,6 +230,16 @@ export function ReviewCycleDetailsPage() {
         setRescheduleAt(toDatetimeLocalValue(data.scheduled_at))
         setScheduleHistory(Array.isArray(history) ? history : [])
         setEmployees(Array.isArray(employeesPage?.content) ? employeesPage.content : [])
+        try {
+          const se = await employeesApi.fetchEmployeeById(data.employee_id)
+          if (!cancelled) {
+            setSubjectEmployee(se)
+          }
+        } catch {
+          if (!cancelled) {
+            setSubjectEmployee(null)
+          }
+        }
       } catch (e) {
         if (cancelled) return
         if (e instanceof ApiError) setError(e.message)
@@ -258,32 +381,86 @@ export function ReviewCycleDetailsPage() {
   const isScheduled = statusKey === 'SCHEDULED'
   const showDirectorActions = canActAsDirector && isFinalPromotion && isScheduled && linkedDecision == null
 
+  const selectedTargetGrade = useMemo(() => {
+    if (!targetGradeId) {
+      return null
+    }
+    const gid = Math.trunc(Number(targetGradeId))
+    if (!Number.isFinite(gid) || gid <= 0) {
+      return null
+    }
+    return eligibleGrades.find((g) => Number(g.id) === gid) ?? null
+  }, [eligibleGrades, targetGradeId])
+
+  const openApproveDecisionModal = useCallback(() => {
+    setActiveAction(null)
+    setModalError(null)
+    setRationale('')
+    setTargetGradeId('')
+    const cur = subjectEmployee?.current_salary_rub_month
+    setModalSalaryRub(cur != null && cur !== '' ? String(Math.trunc(Number(cur))) : '')
+    setDirectorModal('approve')
+  }, [subjectEmployee])
+
+  const openRejectDecisionModal = useCallback(() => {
+    setActiveAction(null)
+    setModalError(null)
+    setRationale('')
+    setImprovementPlanSummary('')
+    setDirectorModal('reject')
+  }, [])
+
+  const closeDirectorModal = useCallback(() => {
+    setDirectorModal(null)
+    setModalError(null)
+  }, [])
+
   /**
    * @param {'APPROVED' | 'REJECTED'} decisionType
    */
-  async function handleMakeDecision(decisionType) {
+  async function submitDirectorDecision(decisionType) {
     if (!cycle || employeeIdFromJwt == null) {
-      setActionError('Не удалось определить сотрудника-директора в сессии.')
+      setModalError('Не удалось определить сотрудника-директора в сессии.')
       return
     }
     const trimmedRationale = rationale.trim()
     if (trimmedRationale === '') {
-      setActionError('Укажите обоснование решения.')
+      setModalError('Укажите обоснование решения.')
       return
     }
     if (decisionType === 'APPROVED' && targetGradeId === '') {
-      setActionError('Выберите целевой грейд для одобрения повышения.')
+      setModalError('Выберите целевой грейд для одобрения повышения.')
       return
     }
     if (decisionType === 'REJECTED' && improvementPlanSummary.trim() === '') {
-      setActionError('Укажите план доработки. После отклонения потребуется новый ИПР и новое собеседование.')
+      setModalError('Укажите план доработки. После отклонения потребуется новый ИПР и новое собеседование.')
       return
+    }
+    /** @type {number | null} */
+    let agreedSalaryRubMonth = null
+    if (decisionType === 'APPROVED') {
+      const raw = modalSalaryRub.trim().replace(/\s/g, '')
+      if (raw === '') {
+        setModalError('Укажите согласованный оклад (руб./мес.).')
+        return
+      }
+      const n = Math.trunc(Number(raw))
+      if (!Number.isFinite(n)) {
+        setModalError('Оклад должен быть целым числом рублей в месяц.')
+        return
+      }
+      if (n < 0) {
+        setModalError('Оклад не может быть отрицательным.')
+        return
+      }
+      agreedSalaryRubMonth = n
     }
 
     setActionBusy(true)
     setActionError(null)
     setActionInfo(null)
-    setPolicyAdvisories(null)
+    setModalError(null)
+    setPromotionDecisionAdvisory(null)
     try {
       const result = await reviewCyclesApi.makeFinalPromotionDecision(cycle.review_cycle_id, {
         director_employee_id: employeeIdFromJwt,
@@ -291,6 +468,7 @@ export function ReviewCycleDetailsPage() {
         target_grade_id: decisionType === 'APPROVED' ? Number(targetGradeId) : null,
         rationale: trimmedRationale,
         improvement_plan_summary: decisionType === 'REJECTED' ? improvementPlanSummary.trim() : null,
+        agreed_salary_rub_month: agreedSalaryRubMonth,
       })
       await reloadCycle()
       const list = await promotionDecisionsApi.fetchPromotionDecisions({
@@ -298,14 +476,25 @@ export function ReviewCycleDetailsPage() {
       })
       setLinkedDecision(Array.isArray(list) && list.length > 0 ? list[0] : null)
       setActionInfo(`Кадровое решение зафиксировано (№${result.promotion_decision_id}).`)
-      if (Array.isArray(result.policy_advisories) && result.policy_advisories.length > 0) {
-        setPolicyAdvisories(result.policy_advisories)
+      const advisories = Array.isArray(result.policy_advisories) ? [...result.policy_advisories] : []
+      const wRaw = result.weighted_score_advisory
+      let weightedNum = null
+      if (wRaw != null && wRaw !== '') {
+        const n = Number(wRaw)
+        if (Number.isFinite(n)) {
+          weightedNum = n
+        }
       }
-      setActiveAction(null)
+      setPromotionDecisionAdvisory({
+        weightedScoreAdvisory: weightedNum,
+        policyCompliant: result.policy_compliant === true,
+        policyAdvisories: advisories,
+      })
+      closeDirectorModal()
     } catch (e) {
-      if (e instanceof ApiError) setActionError(e.message)
-      else if (e instanceof Error) setActionError(e.message)
-      else setActionError('Не удалось зафиксировать кадровое решение')
+      if (e instanceof ApiError) setModalError(e.message)
+      else if (e instanceof Error) setModalError(e.message)
+      else setModalError('Не удалось зафиксировать кадровое решение')
     } finally {
       setActionBusy(false)
     }
@@ -353,7 +542,7 @@ export function ReviewCycleDetailsPage() {
       </ol>
       <h1 className="page__title">Собеседование на повышение</h1>
 
-      {error ? <div className="entity-zone__error" role="alert">{error}</div> : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
       {loading ? <p className="entity-zone__loading">Загрузка…</p> : null}
 
       {!loading && cycle ? (
@@ -373,6 +562,11 @@ export function ReviewCycleDetailsPage() {
                 <span>Плановая дата встречи: {formatDateTimeRuNoSeconds(cycle.scheduled_at)}</span>
                 <span>Дата создания: {formatDateTimeRuNoSeconds(cycle.created_at)}</span>
                 <span>Дата завершения: {formatDateTimeRuNoSeconds(cycle.completed_at)}</span>
+                {canActAsDirector ? (
+                  <span>
+                    Текущий оклад сотрудника: <strong>{formatEmployeeCurrentSalaryDisplay(subjectEmployee)}</strong>
+                  </span>
+                ) : null}
               </div>
             </div>
             <span className={reviewStatusChipClass(cycle.status)}>
@@ -394,7 +588,44 @@ export function ReviewCycleDetailsPage() {
                     Открыть карточку решения
                   </Link>
                 </p>
+                {String(linkedDecision.decision).toUpperCase() === 'APPROVED' &&
+                linkedDecision.agreed_salary_rub_month != null &&
+                linkedDecision.agreed_salary_rub_month !== '' ? (
+                  <p className="entity-zone__idp-muted" style={{ marginTop: '0.35rem' }}>
+                    Согласованный оклад: <strong>{formatRubAmount(linkedDecision.agreed_salary_rub_month)}</strong>
+                  </p>
+                ) : null}
               </article>
+            </section>
+          ) : null}
+
+          {policyPreview ? (
+            <section className="entity-zone__idp-section" aria-labelledby="final-promotion-advisory-heading">
+              <h2 id="final-promotion-advisory-heading" className="entity-zone__idp-section-title">
+                Политика ревью (справочно)
+              </h2>
+              {formatWeightedAdvisoryScoreDisplay(policyPreview.weightedScoreAdvisory) != null ? (
+                <p className="entity-zone__idp-muted" style={{ marginBottom: '0.5rem' }}>
+                  Взвешенный показатель прохождения ИПР (не влияет на действительность решения):{' '}
+                  <strong>{formatWeightedAdvisoryScoreDisplay(policyPreview.weightedScoreAdvisory)}</strong>
+                </p>
+              ) : null}
+              {policyPreview.policyCompliant ? (
+                <InlineAlert variant="success" className="ui-alert--mb-sm" role="status">
+                  По доступным данным замечаний политики нет.
+                </InlineAlert>
+              ) : (
+                <InlineAlert variant="warning" className="ui-alert--mb-sm" role="status">
+                  Есть рекомендательные замечания по политике (решение ими не блокируется).
+                </InlineAlert>
+              )}
+              {policyPreview.policyAdvisories.length > 0 ? (
+                <ul className="entity-zone__idp-muted" style={{ marginTop: '0.35rem' }}>
+                  {policyPreview.policyAdvisories.map((note) => (
+                    <li key={note}>{note}</li>
+                  ))}
+                </ul>
+              ) : null}
             </section>
           ) : null}
 
@@ -403,21 +634,14 @@ export function ReviewCycleDetailsPage() {
               <h2 className="entity-zone__idp-section-title">Действия директора</h2>
 
               {actionError ? (
-                <div className="entity-zone__error" role="alert" style={{ marginBottom: '0.75rem' }}>
+                <InlineAlert variant="error" className="ui-alert--mb-sm">
                   {actionError}
-                </div>
+                </InlineAlert>
               ) : null}
               {actionInfo ? (
                 <p className="entity-zone__idp-muted" style={{ marginBottom: '0.75rem' }}>
                   {actionInfo}
                 </p>
-              ) : null}
-              {policyAdvisories && policyAdvisories.length > 0 ? (
-                <ul className="entity-zone__idp-muted" style={{ marginBottom: '0.75rem' }}>
-                  {policyAdvisories.map((note) => (
-                    <li key={note}>{note}</li>
-                  ))}
-                </ul>
               ) : null}
 
               {showDirectorActions ? (
@@ -429,74 +653,22 @@ export function ReviewCycleDetailsPage() {
                     <button type="button" className="entity-zone__button" disabled={actionBusy} onClick={() => setActiveAction('reschedule')}>
                       Перенести собеседование
                     </button>
-                    <button type="button" className="entity-zone__button" disabled={actionBusy} onClick={() => setActiveAction('reject')}>
+                    <button type="button" className="entity-zone__button" disabled={actionBusy} onClick={openRejectDecisionModal}>
                       Отклонить повышение
                     </button>
-                    <button type="button" className="entity-zone__button entity-zone__button--primary" disabled={actionBusy} onClick={() => setActiveAction('approve')}>
+                    <button
+                      type="button"
+                      className="entity-zone__button entity-zone__button--primary"
+                      disabled={actionBusy || gradeOptionsLoading}
+                      onClick={openApproveDecisionModal}
+                    >
                       Одобрить повышение
                     </button>
                   </div>
 
-                  {activeAction === 'approve' ? (
-                    <>
-                      <label className="entity-zone__field entity-zone__field--grow">
-                        <span className="entity-zone__field-label">Целевой грейд</span>
-                        <SelectDropdown
-                          value={targetGradeId}
-                          onChange={setTargetGradeId}
-                          placeholder="Выберите грейд"
-                          disabled={actionBusy || gradeOptionsLoading || eligibleGrades.length === 0}
-                          options={[
-                            { value: '', label: 'Выберите грейд' },
-                            ...eligibleGrades.map((g) => ({
-                              value: String(g.id),
-                              label: g.name,
-                              description: `Уровень ${g.level_order}`,
-                            })),
-                          ]}
-                        />
-                        {gradeOptionsMessage ? (
-                          <span className="entity-zone__idp-muted" style={{ display: 'block', marginTop: '0.25rem' }}>
-                            {gradeOptionsMessage}
-                          </span>
-                        ) : null}
-                      </label>
-                      <label className="entity-zone__field entity-zone__field--grow" style={{ gridColumn: '1 / -1' }}>
-                        <span className="entity-zone__field-label">Обоснование</span>
-                        <textarea className="entity-zone__input" rows={3} value={rationale} onChange={(ev) => setRationale(ev.target.value)} disabled={actionBusy} />
-                      </label>
-                      <div className="entity-zone__actions" style={{ gridColumn: '1 / -1' }}>
-                        <button type="button" className="entity-zone__button entity-zone__button--primary" disabled={actionBusy} onClick={() => void handleMakeDecision('APPROVED')}>
-                          Одобрить
-                        </button>
-                      </div>
-                    </>
-                  ) : null}
-
-                  {activeAction === 'reject' ? (
-                    <>
-                      <label className="entity-zone__field entity-zone__field--grow" style={{ gridColumn: '1 / -1' }}>
-                        <span className="entity-zone__field-label">План доработки</span>
-                        <textarea className="entity-zone__input" rows={3} value={improvementPlanSummary} onChange={(ev) => setImprovementPlanSummary(ev.target.value)} disabled={actionBusy} />
-                      </label>
-                      <label className="entity-zone__field entity-zone__field--grow" style={{ gridColumn: '1 / -1' }}>
-                        <span className="entity-zone__field-label">Обоснование отклонения</span>
-                        <textarea className="entity-zone__input" rows={3} value={rationale} onChange={(ev) => setRationale(ev.target.value)} disabled={actionBusy} />
-                      </label>
-                      <p className="entity-zone__idp-muted" style={{ gridColumn: '1 / -1' }}>
-                        После отклонения создайте новый ИПР, завершите его и назначьте новое собеседование.
-                      </p>
-                      <div className="entity-zone__actions" style={{ gridColumn: '1 / -1' }}>
-                        <button type="button" className="entity-zone__button entity-zone__button--primary" disabled={actionBusy} onClick={() => void handleMakeDecision('REJECTED')}>
-                          Зафиксировать отклонение
-                        </button>
-                      </div>
-                    </>
-                  ) : null}
-
                   {activeAction === 'reschedule' ? (
                     <div className="entity-zone__filters entity-zone__filters--reschedule-row">
-                      <label className="entity-zone__field">
+                      <label className="entity-zone__field entity-zone__field--reschedule-datetime">
                         <span className="entity-zone__field-label">Новая дата и время</span>
                         <input className="entity-zone__input" type="datetime-local" value={rescheduleAt} onChange={(ev) => setRescheduleAt(ev.target.value)} disabled={actionBusy} />
                       </label>
@@ -504,11 +676,16 @@ export function ReviewCycleDetailsPage() {
                         <span className="entity-zone__field-label">Комментарий</span>
                         <input className="entity-zone__input" value={rescheduleComment} onChange={(ev) => setRescheduleComment(ev.target.value)} disabled={actionBusy} />
                       </label>
-                      <div className="entity-zone__actions entity-zone__actions--reschedule-submit">
-                        <button type="button" className="entity-zone__button entity-zone__button--primary" disabled={actionBusy} onClick={() => void handleReschedule()}>
-                          Подтвердить
-                        </button>
-                      </div>
+                      <label className="entity-zone__field entity-zone__field--reschedule-submit">
+                        <span className="entity-zone__field-label" aria-hidden="true">
+                          {'\u00a0'}
+                        </span>
+                        <div className="entity-zone__actions entity-zone__actions--reschedule-submit">
+                          <button type="button" className="entity-zone__button entity-zone__button--primary" disabled={actionBusy} onClick={() => void handleReschedule()}>
+                            Подтвердить
+                          </button>
+                        </div>
+                      </label>
                     </div>
                   ) : null}
                 </div>
@@ -581,6 +758,133 @@ export function ReviewCycleDetailsPage() {
             </section>
           ) : null}
         </section>
+      ) : null}
+
+      {directorModal && cycle ? (
+        <div
+          className="entity-zone__modal-backdrop"
+          role="presentation"
+          onClick={() => {
+            if (!actionBusy) {
+              closeDirectorModal()
+            }
+          }}
+        >
+          <section
+            className="entity-zone__modal entity-zone__modal--wide"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="director-decision-modal-title"
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <div className="entity-zone__modal-head">
+              <h3 id="director-decision-modal-title" className="entity-zone__modal-title">
+                {directorModal === 'approve' ? 'Одобрение повышения' : 'Отклонение повышения'}
+              </h3>
+              <button type="button" className="entity-zone__icon-button" onClick={closeDirectorModal} aria-label="Закрыть" disabled={actionBusy}>
+                {'\u00D7'}
+              </button>
+            </div>
+
+            {modalError ? <InlineAlert variant="error" className="ui-alert--mb-sm">{modalError}</InlineAlert> : null}
+
+            {directorModal === 'approve' ? (
+              <div className="entity-zone__filters">
+                <p className="entity-zone__idp-muted" style={{ gridColumn: '1 / -1' }}>
+                  Текущий оклад сотрудника: <strong>{formatEmployeeCurrentSalaryDisplay(subjectEmployee)}</strong>
+                </p>
+                <label className="entity-zone__field entity-zone__field--grow">
+                  <span className="entity-zone__field-label">Целевой грейд</span>
+                  <SelectDropdown
+                    value={targetGradeId}
+                    onChange={setTargetGradeId}
+                    placeholder="Выберите грейд"
+                    disabled={actionBusy || gradeOptionsLoading || eligibleGrades.length === 0}
+                    options={[
+                      { value: '', label: 'Выберите грейд' },
+                      ...eligibleGrades.map((g) => ({
+                        value: String(g.id),
+                        label: g.name,
+                        description: `Уровень ${g.level_order}`,
+                      })),
+                    ]}
+                  />
+                  {gradeOptionsMessage ? (
+                    <InlineAlert variant="warning" role="status" className="ui-alert--field-hint">
+                      {gradeOptionsMessage}
+                    </InlineAlert>
+                  ) : null}
+                </label>
+                <p className="entity-zone__idp-muted" style={{ gridColumn: '1 / -1', marginTop: 0 }}>
+                  Зарплатная вилка по целевому грейду: <strong>{salaryForkCaption(selectedTargetGrade)}</strong>
+                </p>
+                <label className="entity-zone__field entity-zone__field--grow" style={{ gridColumn: '1 / -1' }}>
+                  <span className="entity-zone__field-label">Согласованный оклад, ₽/мес.</span>
+                  <input
+                    className="entity-zone__input"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    value={modalSalaryRub}
+                    onChange={(ev) => setModalSalaryRub(ev.target.value)}
+                    disabled={actionBusy}
+                    placeholder="Например: 180000"
+                  />
+                </label>
+                <label className="entity-zone__field entity-zone__field--grow" style={{ gridColumn: '1 / -1' }}>
+                  <span className="entity-zone__field-label">Обоснование</span>
+                  <textarea className="entity-zone__input" rows={3} value={rationale} onChange={(ev) => setRationale(ev.target.value)} disabled={actionBusy} />
+                </label>
+                <div className="entity-zone__actions" style={{ gridColumn: '1 / -1' }}>
+                  <button type="button" className="entity-zone__button" disabled={actionBusy} onClick={closeDirectorModal}>
+                    Отмена
+                  </button>
+                  <button
+                    type="button"
+                    className="entity-zone__button entity-zone__button--primary"
+                    disabled={actionBusy}
+                    onClick={() => void submitDirectorDecision('APPROVED')}
+                  >
+                    Одобрить
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="entity-zone__filters">
+                <label className="entity-zone__field entity-zone__field--grow" style={{ gridColumn: '1 / -1' }}>
+                  <span className="entity-zone__field-label">План доработки</span>
+                  <textarea
+                    className="entity-zone__input"
+                    rows={3}
+                    value={improvementPlanSummary}
+                    onChange={(ev) => setImprovementPlanSummary(ev.target.value)}
+                    disabled={actionBusy}
+                  />
+                </label>
+                <label className="entity-zone__field entity-zone__field--grow" style={{ gridColumn: '1 / -1' }}>
+                  <span className="entity-zone__field-label">Обоснование отклонения</span>
+                  <textarea className="entity-zone__input" rows={3} value={rationale} onChange={(ev) => setRationale(ev.target.value)} disabled={actionBusy} />
+                </label>
+                <p className="entity-zone__idp-muted" style={{ gridColumn: '1 / -1' }}>
+                  После отклонения создайте новый ИПР, завершите его и назначьте новое собеседование.
+                </p>
+                <div className="entity-zone__actions" style={{ gridColumn: '1 / -1' }}>
+                  <button type="button" className="entity-zone__button" disabled={actionBusy} onClick={closeDirectorModal}>
+                    Отмена
+                  </button>
+                  <button
+                    type="button"
+                    className="entity-zone__button entity-zone__button--primary"
+                    disabled={actionBusy}
+                    onClick={() => void submitDirectorDecision('REJECTED')}
+                  >
+                    Зафиксировать отклонение
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
       ) : null}
     </article>
   )

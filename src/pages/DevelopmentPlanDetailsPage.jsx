@@ -5,7 +5,9 @@ import { useAuth } from '../auth/useAuth.js'
 import { hasTeamLeadRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import { DevelopmentPlanAddTaskForm } from '../components/DevelopmentPlanAddTaskForm.jsx'
+import { InlineAlert } from '../components/ui/Alert.jsx'
 import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
+import { isDevelopmentPlanApprovedActive } from '../utils/developmentPlanAccess.js'
 import './pages.css'
 import './EntityZone.css'
 
@@ -100,9 +102,9 @@ function CompetencyTeamLeadApproveForm({ planId, item, participantEmployeeId, on
         />
       </label>
       {localError ? (
-        <p className="entity-zone__error" role="alert" style={{ marginTop: '0.35rem' }}>
+        <InlineAlert variant="error" className="ui-alert--field-hint">
           {localError}
-        </p>
+        </InlineAlert>
       ) : null}
       <div className="entity-zone__actions" style={{ marginTop: '0.5rem' }}>
         <button
@@ -209,6 +211,7 @@ export function DevelopmentPlanDetailsPage() {
     Number(plan.team_lead_id) === Number(employeeIdFromJwt)
 
   const planIsActive = plan != null && planStatusKey === 'ACTIVE'
+  const planApprovedActive = plan != null && isDevelopmentPlanApprovedActive(plan)
   const planIsDraft = plan != null && planStatusKey === 'DRAFT'
   const planIsTerminal =
     plan != null && (planStatusKey === 'COMPLETED' || planStatusKey === 'CLOSED')
@@ -279,7 +282,7 @@ export function DevelopmentPlanDetailsPage() {
       </ol>
       <h1 className="page__title">Детали ИПР</h1>
 
-      {error ? <div className="entity-zone__error" role="alert">{error}</div> : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
       {loading ? <p className="entity-zone__loading">Загрузка…</p> : null}
       {!loading && plan ? (
         <section className="entity-zone__summary">
@@ -365,9 +368,9 @@ export function DevelopmentPlanDetailsPage() {
                     Вы — участник согласования. Подтвердите ИПР, чтобы зафиксировать своё согласие.
                   </p>
                   {approveError ? (
-                    <div className="entity-zone__error" role="alert" style={{ marginBottom: '0.5rem' }}>
+                    <InlineAlert variant="error" className="ui-alert--mb-sm">
                       {approveError}
-                    </div>
+                    </InlineAlert>
                   ) : null}
                   <div className="entity-zone__actions">
                     <button
@@ -432,14 +435,14 @@ export function DevelopmentPlanDetailsPage() {
                 </p>
               )}
               {completeError ? (
-                <div className="entity-zone__error" role="alert" style={{ marginTop: '0.5rem' }}>
+                <InlineAlert variant="error" className="ui-alert--mt-sm">
                   {completeError}
-                </div>
+                </InlineAlert>
               ) : null}
               {closeError ? (
-                <div className="entity-zone__error" role="alert" style={{ marginTop: '0.5rem' }}>
+                <InlineAlert variant="error" className="ui-alert--mt-sm">
                   {closeError}
-                </div>
+                </InlineAlert>
               ) : null}
               <div className="entity-zone__actions entity-zone__actions--idp-tl" style={{ marginTop: '0.5rem' }}>
                 {(planIsDraft || (planIsActive && planReadyForComplete)) ? (
@@ -521,9 +524,13 @@ export function DevelopmentPlanDetailsPage() {
                   return (
                     <article key={task.id} className="entity-zone__idp-card">
                       <div className="entity-zone__idp-card-head">
-                        <Link className="entity-zone__idp-link" to={`/development-plans/${plan.id}/tasks/${task.id}`}>
-                          {task.title}
-                        </Link>
+                        {planApprovedActive ? (
+                          <Link className="entity-zone__idp-link" to={`/development-plans/${plan.id}/tasks/${task.id}`}>
+                            {task.title}
+                          </Link>
+                        ) : (
+                          <span className="entity-zone__idp-card-title">{task.title}</span>
+                        )}
                         <div className="entity-zone__idp-chip-row">
                           <span className={taskStatusChipClass(st)}>{taskStLabel}</span>
                           <span className="entity-zone__idp-chip">{typeLabel}</span>

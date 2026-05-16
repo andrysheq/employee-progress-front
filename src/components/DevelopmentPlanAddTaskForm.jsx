@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ApiError, developmentPlansApi } from '../api/index.js'
 import { idpTaskDraftToApiPayload, newIdpTaskDraft } from '../utils/idpTaskDraft.js'
 import { IDP_TASK_PRIORITY_OPTIONS, IDP_TASK_TYPE_OPTIONS } from '../utils/idpSelectOptions.js'
+import { InlineAlert } from './ui/Alert.jsx'
 import { SelectDropdown } from './ui/SelectDropdown.jsx'
 
 /**
@@ -100,9 +101,9 @@ export function DevelopmentPlanAddTaskForm({ planId, defaultPlannedStartDate, on
         </label>
       </div>
       {error ? (
-        <div className="entity-zone__error" role="alert" style={{ marginTop: '0.5rem' }}>
+        <InlineAlert variant="error" className="ui-alert--mt-sm ui-alert--mb-0">
           {error}
-        </div>
+        </InlineAlert>
       ) : null}
       <div className="entity-zone__actions" style={{ marginTop: '0.5rem' }}>
         <button

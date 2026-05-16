@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom'
 import { ApiError, departmentsApi, employeesApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { InlineAlert } from '../components/ui/Alert.jsx'
+import { useDisplayWhileRefreshing } from '../hooks/useDisplayWhileRefreshing.js'
+import { cn } from '../lib/utils.js'
 import './pages.css'
 import './EntityZone.css'
 
@@ -129,6 +132,8 @@ export function DepartmentsPage() {
     return null
   }
 
+  const { displayData: displayItems, showBlockingSpinner, isRefreshing } = useDisplayWhileRefreshing(items, loading)
+
   return (
     <article className="page">
       <ol className="page__breadcrumbs">
@@ -141,9 +146,9 @@ export function DepartmentsPage() {
       <h1 className="page__title">Отделы</h1>
 
       {companyId == null ? (
-        <div className="entity-zone__error" role="status">
+        <InlineAlert variant="warning" role="status">
           Не удалось определить компанию для загрузки отделов. Обновите страницу или войдите заново.
-        </div>
+        </InlineAlert>
       ) : (
         <div className="entity-zone__toolbar">
           <label className="entity-zone__toggle">
@@ -157,21 +162,24 @@ export function DepartmentsPage() {
         </div>
       )}
 
-      {error ? (
-        <div className="entity-zone__error" role="alert">
-          {error}
-        </div>
-      ) : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
 
-      {loading ? <p className="entity-zone__loading">Загрузка...</p> : null}
+      {showBlockingSpinner ? <p className="entity-zone__loading">Загрузка...</p> : null}
 
-      {!loading && companyId != null && items && items.length === 0 ? (
+      {companyId != null && displayItems && displayItems.length === 0 && !error && !showBlockingSpinner ? (
         <p className="entity-zone__empty">Отделы не найдены.</p>
       ) : null}
 
-      {!loading && items && items.length > 0 ? (
-        <div className="entity-zone__grid entity-zone__grid--idp">
-          {items.map((d) => {
+      {displayItems && displayItems.length > 0 ? (
+        <div
+          className={cn(
+            'entity-zone__results-surface',
+            isRefreshing && 'entity-zone__results-surface--refreshing',
+          )}
+          aria-busy={isRefreshing || undefined}
+        >
+          <div className="entity-zone__grid entity-zone__grid--idp">
+          {displayItems.map((d) => {
             const employeesCount = resolveEmployeeCount(d)
             const directorId = Number(d.director_employee_id)
             const directorNameFromDepartment = String(d.director_employee_full_name ?? d.director_full_name ?? '').trim()
@@ -203,6 +211,7 @@ export function DepartmentsPage() {
               </article>
             )
           })}
+          </div>
         </div>
       ) : null}
     </article>

@@ -5,7 +5,10 @@ import { useAuth } from '../auth/useAuth.js'
 import { hasDirectorRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
+import { InlineAlert } from '../components/ui/Alert.jsx'
 import { SelectDropdown } from '../components/ui/SelectDropdown.jsx'
+import { useDisplayWhileRefreshing } from '../hooks/useDisplayWhileRefreshing.js'
+import { cn } from '../lib/utils.js'
 import './pages.css'
 import './EntityZone.css'
 
@@ -125,6 +128,8 @@ export function PromotionDecisionsPage() {
     void load()
   }, [load])
 
+  const { displayData: displayItems, showBlockingSpinner, isRefreshing } = useDisplayWhileRefreshing(items, loading)
+
   return (
     <article className="page">
       <ol className="page__breadcrumbs">
@@ -138,9 +143,9 @@ export function PromotionDecisionsPage() {
       <p className="page__lead">История решений по итогам ревью. Нажмите на карточку, чтобы открыть детали.</p>
 
       {companyId == null ? (
-        <div className="entity-zone__error" role="status">
+        <InlineAlert variant="warning" role="status">
           Не удалось определить компанию.
-        </div>
+        </InlineAlert>
       ) : null}
 
       <form
@@ -191,21 +196,24 @@ export function PromotionDecisionsPage() {
         </button>
       </div>
 
-      {error ? (
-        <div className="entity-zone__error" role="alert">
-          {error}
-        </div>
-      ) : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
 
-      {loading ? <p className="entity-zone__loading">Загрузка…</p> : null}
+      {showBlockingSpinner ? <p className="entity-zone__loading">Загрузка…</p> : null}
 
-      {!loading && items && items.length === 0 && !error ? (
+      {canRead && displayItems && displayItems.length === 0 && !error ? (
         <p className="entity-zone__empty">Кадровые решения не найдены.</p>
       ) : null}
 
-      {!loading && canRead && items && items.length > 0 ? (
-        <div className="entity-zone__grid entity-zone__grid--idp">
-          {items.map((item) => {
+      {canRead && displayItems && displayItems.length > 0 ? (
+        <div
+          className={cn(
+            'entity-zone__results-surface',
+            isRefreshing && 'entity-zone__results-surface--refreshing',
+          )}
+          aria-busy={isRefreshing || undefined}
+        >
+          <div className="entity-zone__grid entity-zone__grid--idp">
+          {displayItems.map((item) => {
             const decisionKey = String(item.decision ?? '').toUpperCase()
             const decisionLabel =
               DECISION_LABEL[/** @type {keyof typeof DECISION_LABEL} */ (decisionKey)] ?? item.decision
@@ -245,6 +253,7 @@ export function PromotionDecisionsPage() {
               </article>
             )
           })}
+          </div>
         </div>
       ) : null}
     </article>

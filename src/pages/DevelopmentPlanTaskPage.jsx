@@ -4,7 +4,9 @@ import { ApiError, developmentPlansApi, employeesApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
 import { hasTeamLeadRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
+import { Alert, AlertDescription, AlertVariantIcon, InlineAlert } from '../components/ui/Alert.jsx'
 import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
+import { isDevelopmentPlanApprovedActive } from '../utils/developmentPlanAccess.js'
 import './pages.css'
 import './EntityZone.css'
 
@@ -105,23 +107,42 @@ export function DevelopmentPlanTaskPage() {
       try {
         const pId = Number(planId)
         const tId = Number(taskId)
-        const [planData, tasks, progress, commentsData, attachmentsData, employeesPage] = await Promise.all([
-          developmentPlansApi.fetchDevelopmentPlanById(pId),
-          developmentPlansApi.fetchPlanTasks(pId),
-          developmentPlansApi.fetchTaskProgressHistory(pId, tId),
-          developmentPlansApi.fetchTaskComments(pId, tId),
-          developmentPlansApi.fetchTaskAttachments(pId, tId),
+        const planData = await developmentPlansApi.fetchDevelopmentPlanById(pId)
+        if (cancelled) return
+
+        const approvedActive = isDevelopmentPlanApprovedActive(planData)
+        const tasks = Array.isArray(planData.tasks) ? planData.tasks : []
+        const taskFromPlan = tasks.find((x) => Number(x.id) === tId) ?? null
+
+        let progress = []
+        let commentsData = []
+        let attachmentsData = []
+        if (approvedActive && taskFromPlan != null) {
+          const [progressRes, commentsRes, attachmentsRes] = await Promise.all([
+            developmentPlansApi.fetchTaskProgressHistory(pId, tId),
+            developmentPlansApi.fetchTaskComments(pId, tId),
+            developmentPlansApi.fetchTaskAttachments(pId, tId),
+          ])
+          progress = Array.isArray(progressRes) ? progressRes : []
+          commentsData = Array.isArray(commentsRes) ? commentsRes : []
+          attachmentsData = Array.isArray(attachmentsRes) ? attachmentsRes : []
+        }
+
+        const employeesPage =
           companyId == null
-            ? Promise.resolve({ content: [] })
-            : employeesApi.fetchEmployeesRegistry({ company_id: companyId }, { size: 300, sort: 'fullName,asc' }),
-        ])
+            ? { content: [] }
+            : await employeesApi.fetchEmployeesRegistry({ company_id: companyId }, { size: 300, sort: 'fullName,asc' })
+
         if (cancelled) return
         setPlan(planData)
-        setTask((tasks ?? []).find((x) => Number(x.id) === tId) ?? null)
-        setProgressHistory(Array.isArray(progress) ? progress : [])
-        setComments(Array.isArray(commentsData) ? commentsData : [])
-        setAttachments(Array.isArray(attachmentsData) ? attachmentsData : [])
+        setTask(taskFromPlan)
+        setProgressHistory(progress)
+        setComments(commentsData)
+        setAttachments(attachmentsData)
         setEmployees(Array.isArray(employeesPage?.content) ? employeesPage.content : [])
+        if (taskFromPlan == null) {
+          setError('Задача не найдена в этом плане.')
+        }
       } catch (e) {
         if (cancelled) return
         if (e instanceof ApiError) setError(e.message)
@@ -143,8 +164,7 @@ export function DevelopmentPlanTaskPage() {
     return m
   }, [employees])
 
-  const planExecutionReady =
-    plan != null && String(plan.status ?? '').toUpperCase() === 'ACTIVE'
+  const planExecutionReady = useMemo(() => isDevelopmentPlanApprovedActive(plan), [plan])
 
   const isPlanEmployee =
     plan != null && employeeIdFromJwt != null && Number(plan.employee_id) === Number(employeeIdFromJwt)
@@ -182,19 +202,22 @@ export function DevelopmentPlanTaskPage() {
       </ol>
       <h1 className="page__title">Задача ИПР</h1>
 
-      {error ? <div className="entity-zone__error" role="alert">{error}</div> : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
       {loading ? <p className="entity-zone__loading">Загрузка…</p> : null}
 
       {!loading && plan && !planExecutionReady ? (
-        <div className="entity-zone__error" role="alert" style={{ marginBottom: '1rem' }}>
-          <p style={{ margin: '0 0 0.5rem' }}>
-            ИПР ещё не согласован всеми участниками. Прогресс по задаче и другие операции недоступны, пока
-            план не станет активным.
-          </p>
-          <Link className="entity-zone__link" to={`/development-plans/${planId}`}>
-            Перейти к согласованию ИПР
-          </Link>
-        </div>
+        <Alert variant="warning" role="alert" className="ui-alert--mb-lg">
+          <AlertVariantIcon variant="warning" />
+          <AlertDescription>
+            <p style={{ margin: '0 0 0.5rem' }}>
+              ИПР ещё не согласован всеми участниками. Прогресс по задаче и другие операции недоступны, пока
+              план не станет активным.
+            </p>
+            <Link className="entity-zone__link" to={`/development-plans/${planId}`}>
+              Перейти к согласованию ИПР
+            </Link>
+          </AlertDescription>
+        </Alert>
       ) : null}
       {!loading && task ? (
         <section className="entity-zone__summary">
@@ -284,9 +307,9 @@ export function DevelopmentPlanTaskPage() {
                   placeholder="Текст комментария…"
                 />
                 {commentError ? (
-                  <div className="entity-zone__error" role="alert" style={{ marginTop: '0.35rem' }}>
+                  <InlineAlert variant="error" className="ui-alert--field-hint">
                     {commentError}
-                  </div>
+                  </InlineAlert>
                 ) : null}
                 <div className="entity-zone__actions" style={{ marginTop: '0.5rem' }}>
                   <button
@@ -340,9 +363,9 @@ export function DevelopmentPlanTaskPage() {
                 />
               </label>
               {doneError ? (
-                <div className="entity-zone__error" role="alert" style={{ marginTop: '0.35rem' }}>
+                <InlineAlert variant="error" className="ui-alert--field-hint">
                   {doneError}
-                </div>
+                </InlineAlert>
               ) : null}
               <div className="entity-zone__actions" style={{ marginTop: '0.5rem' }}>
                 <button

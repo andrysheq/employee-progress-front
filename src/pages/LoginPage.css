@@ -81,16 +81,6 @@
   cursor: not-allowed;
 }
 
-.login-card__error {
-  margin: 0 0 1rem;
-  padding: 0.65rem 0.75rem;
-  font-size: 0.8125rem;
-  border-radius: var(--radius-md);
-  border: 1px solid color-mix(in srgb, var(--destructive) 45%, var(--border));
-  background: color-mix(in srgb, var(--destructive) 10%, var(--card));
-  color: color-mix(in srgb, var(--destructive) 85%, var(--foreground));
-}
-
 .login-card__submit {
   box-sizing: border-box;
   width: 100%;

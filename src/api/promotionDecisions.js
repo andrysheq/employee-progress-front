@@ -19,6 +19,7 @@ import { buildRegistryQuery, normalizePage } from './registry.js'
  * @property {number} decided_by_id
  * @property {string} decided_by_name
  * @property {string} decided_at
+ * @property {number | null} [agreed_salary_rub_month]
  */
 
 /**

@@ -34,6 +34,140 @@
   margin-bottom: 0.5rem;
 }
 
+.page__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.page__title-row .page__title {
+  margin-bottom: 0;
+}
+
+.grade-model__competencies-card,
+.home-hub__card {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  width: 100%;
+  max-width: 40rem;
+  margin: 0 0 1.25rem;
+  padding: 1rem 2.75rem 1rem 1.1rem;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  color: inherit;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: var(--ui-radius-xl);
+  background: color-mix(in srgb, var(--card) 92%, var(--primary) 5%);
+  box-shadow: var(--ui-shadow-xs);
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.grade-model__competencies-card:hover:not(:disabled),
+.home-hub__card:hover {
+  border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
+  background: color-mix(in srgb, var(--card) 86%, var(--primary) 10%);
+  box-shadow: var(--ui-shadow-md);
+  text-decoration: none;
+}
+
+.grade-model__competencies-card:focus-visible,
+.home-hub__card:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-shadow-md), 0 0 0 2px var(--background), 0 0 0 4px color-mix(in srgb, var(--ring) 55%, transparent);
+}
+
+.grade-model__competencies-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.grade-model__competencies-card-title,
+.home-hub__card-title {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--foreground);
+}
+
+.grade-model__competencies-card-desc,
+.home-hub__card-desc {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--muted-foreground);
+}
+
+.grade-model__competencies-card-chevron,
+.home-hub__card-chevron {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--muted-foreground);
+}
+
+.home-hub {
+  margin-top: 0.25rem;
+}
+
+.home-hub__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
+  gap: 1.35rem;
+  max-width: 72rem;
+}
+
+.home-hub__grid .home-hub__card {
+  max-width: none;
+  margin: 0;
+  min-height: 7rem;
+  padding: 1.35rem 3.25rem 1.35rem 1.35rem;
+  text-decoration: none;
+  gap: 0.5rem;
+}
+
+.home-hub__grid .home-hub__card:focus,
+.home-hub__grid .home-hub__card:focus-visible,
+.home-hub__grid .home-hub__card:active {
+  text-decoration: none;
+}
+
+.home-hub__grid .home-hub__card-title {
+  font-size: 1.0625rem;
+}
+
+.home-hub__grid .home-hub__card-desc {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.home-hub__grid .home-hub__card-chevron {
+  right: 1.2rem;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Выше специфичность, чем у `a:hover` в global.css — без подчёркивания и смены цвета текста */
+a.home-hub__card:hover,
+a.home-hub__card:focus,
+a.home-hub__card:focus-visible,
+a.home-hub__card:active {
+  text-decoration: none;
+  color: inherit;
+}
+
 .page__lead {
   max-width: 42rem;
   margin-bottom: 1.5rem;
@@ -50,27 +184,6 @@
 
 .page__stub p {
   margin: 0;
-}
-
-.home-links {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  max-width: 28rem;
-}
-
-.home-links a {
-  font-size: 0.9375rem;
-  color: var(--color-text);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.home-links a:hover {
-  color: var(--color-accent);
 }
 
 .page code {

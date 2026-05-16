@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { TrashIcon } from '@radix-ui/react-icons'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, gradeModelApi } from '../api/index.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import { ConfirmDialog } from '../components/ConfirmDialog.jsx'
+import { InlineAlert } from '../components/ui/Alert.jsx'
 import { SelectDropdown } from '../components/ui/SelectDropdown.jsx'
+import { useDisplayWhileRefreshing } from '../hooks/useDisplayWhileRefreshing.js'
+import { cn } from '../lib/utils.js'
 import './pages.css'
 import './EntityZone.css'
 
@@ -194,12 +198,14 @@ export function PositionGradesPage() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [gradeForm, submitting])
 
+  const { displayData: displayMatrix, showBlockingSpinner, isRefreshing } = useDisplayWhileRefreshing(matrix, loading)
+
   const row = useMemo(() => {
-    if (!matrix?.positions || positionId == null) {
+    if (!displayMatrix?.positions || positionId == null) {
       return null
     }
-    return matrix.positions.find((item) => item.position?.id === positionId) ?? null
-  }, [matrix, positionId])
+    return displayMatrix.positions.find((item) => item.position?.id === positionId) ?? null
+  }, [displayMatrix, positionId])
 
   const position = row?.position ?? null
   const grades = useMemo(() => {
@@ -514,30 +520,29 @@ export function PositionGradesPage() {
       </div>
 
       {dictionariesError && position ? (
-        <div className="entity-zone__error" role="alert">
+        <InlineAlert variant="error">
           {dictionariesError} Управление требованиями по компетенциям недоступно, пока не загрузятся справочники.
-        </div>
+        </InlineAlert>
       ) : null}
 
-      {error ? (
-        <div className="entity-zone__error" role="alert">
-          {error}
-        </div>
-      ) : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
 
-      {actionError && !gradeForm && !criterionForm ? (
-        <div className="entity-zone__error" role="alert">
-          {actionError}
-        </div>
-      ) : null}
+      {actionError && !gradeForm && !criterionForm ? <InlineAlert variant="error">{actionError}</InlineAlert> : null}
 
-      {loading ? <p className="entity-zone__loading">Загрузка…</p> : null}
+      {showBlockingSpinner ? <p className="entity-zone__loading">Загрузка…</p> : null}
 
-      {!loading && !error && !position ? (
+      {!error && !position && !showBlockingSpinner ? (
         <p className="entity-zone__empty">Должность не найдена в матрице грейдов.</p>
       ) : null}
 
-      {!loading && position ? (
+      {position ? (
+        <div
+          className={cn(
+            'entity-zone__results-surface',
+            isRefreshing && 'entity-zone__results-surface--refreshing',
+          )}
+          aria-busy={isRefreshing || undefined}
+        >
         <section className="entity-zone__matrix-block">
           <div className="entity-zone__matrix-block-title">Грейды</div>
           <div className="entity-zone__grades-table">
@@ -587,7 +592,7 @@ export function PositionGradesPage() {
                             onClick={() => setGradeToDeactivate(g.id)}
                             disabled={submitting || !g.is_active}
                           >
-                            {'\u2212'}
+                            <TrashIcon aria-hidden />
                           </button>
                         </span>
                       ) : null}
@@ -632,7 +637,7 @@ export function PositionGradesPage() {
                                   }
                                   disabled={submitting || !dictReady}
                                 >
-                                  {'\u2212'}
+                                  <TrashIcon aria-hidden />
                                 </button>
                               </span>
                             ) : null}
@@ -669,6 +674,7 @@ export function PositionGradesPage() {
             )}
           </div>
         </section>
+        </div>
       ) : null}
 
       {gradeForm ? (
@@ -695,11 +701,7 @@ export function PositionGradesPage() {
               </button>
             </div>
 
-            {actionError ? (
-              <div className="entity-zone__error" role="alert">
-                {actionError}
-              </div>
-            ) : null}
+            {actionError ? <InlineAlert variant="error" className="ui-alert--mb-sm">{actionError}</InlineAlert> : null}
 
             <div className="entity-zone__filters">
               <label className="entity-zone__field">
@@ -810,11 +812,7 @@ export function PositionGradesPage() {
               <strong>{grades.find((gr) => gr.id === criterionForm.gradeId)?.name ?? '—'}</strong>
             </p>
 
-            {criterionError ? (
-              <div className="entity-zone__error" role="alert">
-                {criterionError}
-              </div>
-            ) : null}
+            {criterionError ? <InlineAlert variant="error" className="ui-alert--mb-sm">{criterionError}</InlineAlert> : null}
 
             <div className="entity-zone__filters entity-zone__filters--row">
               <label className="entity-zone__field entity-zone__field--wide">

@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
+import { ChevronRightIcon, TrashIcon } from '@radix-ui/react-icons'
 import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, gradeModelApi } from '../api/index.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import { ConfirmDialog } from '../components/ConfirmDialog.jsx'
+import { InlineAlert } from '../components/ui/Alert.jsx'
 import { SpotlightCard } from '../components/ui/SpotlightCard.jsx'
+import { useDisplayWhileRefreshing } from '../hooks/useDisplayWhileRefreshing.js'
+import { cn } from '../lib/utils.js'
 import './pages.css'
 import './EntityZone.css'
 
@@ -73,6 +77,13 @@ export function GradeModelPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const openCompetenciesModal = useCallback(() => {
+    setCompetencyModalOpen(true)
+    setCompetencyForm(null)
+    setCompetencyActionError(null)
+    setCompetencyToDelete(null)
+  }, [])
 
   useEffect(() => {
     if (!competencyModalOpen || competencyForm != null) {
@@ -147,7 +158,9 @@ export function GradeModelPage() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [positionForm, submitting])
 
-  const positions = matrix?.positions && Array.isArray(matrix.positions) ? matrix.positions : []
+  const { displayData: displayMatrix, showBlockingSpinner, isRefreshing } = useDisplayWhileRefreshing(matrix, loading)
+  const positions =
+    displayMatrix?.positions && Array.isArray(displayMatrix.positions) ? displayMatrix.positions : []
 
   /** @param {import('../api/gradeModel.js').PositionView} p */
   function openEditPosition(p) {
@@ -340,14 +353,51 @@ export function GradeModelPage() {
         <li>Матрица грейдов</li>
       </ol>
 
-      <h1 className="page__title">Матрица грейдов</h1>
+      <div className="page__title-row">
+        <h1 className="page__title">Матрица грейдов</h1>
+        {companyId != null && canManage ? (
+          <button
+            type="button"
+            className="entity-zone__button entity-zone__button--primary"
+            onClick={() => {
+              setActionError(null)
+              setPositionForm({
+                mode: 'create',
+                code: '',
+                name: '',
+                description: '',
+                isActive: true,
+              })
+            }}
+            disabled={submitting}
+          >
+            Добавить должность
+          </button>
+        ) : null}
+      </div>
+
+      {companyId != null && canManage ? (
+        <button
+          type="button"
+          className="grade-model__competencies-card"
+          onClick={openCompetenciesModal}
+          disabled={submitting}
+          aria-label="Открыть справочник компетенций"
+        >
+          <span className="grade-model__competencies-card-title">Компетенции</span>
+          <span className="grade-model__competencies-card-desc">
+            Открыть справочник компетенций: список, добавление и редактирование записей для матрицы грейдов.
+          </span>
+          <ChevronRightIcon className="grade-model__competencies-card-chevron" aria-hidden />
+        </button>
+      ) : null}
 
       {companyId == null ? (
-        <div className="entity-zone__error" role="status">
+        <InlineAlert variant="warning" role="status">
           Не удалось определить компанию для загрузки матрицы. Обновите страницу или войдите заново.
-        </div>
+        </InlineAlert>
       ) : (
-        <div className="entity-zone__toolbar entity-zone__toolbar--spread">
+        <div className="entity-zone__toolbar">
           <label className="entity-zone__toggle">
             <input
               type="checkbox"
@@ -356,66 +406,28 @@ export function GradeModelPage() {
             />
             Только активные должности
           </label>
-
-          {canManage ? (
-            <div className="entity-zone__toolbar-actions">
-              <button
-                type="button"
-                className="entity-zone__button"
-                onClick={() => {
-                  setCompetencyModalOpen(true)
-                  setCompetencyForm(null)
-                  setCompetencyActionError(null)
-                  setCompetencyToDelete(null)
-                }}
-                disabled={submitting}
-              >
-                Компетенции
-              </button>
-              <button
-                type="button"
-                className="entity-zone__icon-button"
-                onClick={() => {
-                  setActionError(null)
-                  setPositionForm({
-                    mode: 'create',
-                    code: '',
-                    name: '',
-                    description: '',
-                    isActive: true,
-                  })
-                }}
-                title="Добавить должность"
-                aria-label="Добавить должность"
-                disabled={submitting}
-              >
-                +
-              </button>
-            </div>
-          ) : null}
         </div>
       )}
 
-      {error ? (
-        <div className="entity-zone__error" role="alert">
-          {error}
-        </div>
-      ) : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
 
-      {actionError && !positionForm ? (
-        <div className="entity-zone__error" role="alert">
-          {actionError}
-        </div>
-      ) : null}
+      {actionError && !positionForm ? <InlineAlert variant="error">{actionError}</InlineAlert> : null}
 
-      {loading ? <p className="entity-zone__loading">Загрузка…</p> : null}
+      {showBlockingSpinner ? <p className="entity-zone__loading">Загрузка…</p> : null}
 
-      {!loading && companyId != null && positions.length === 0 && !error ? (
+      {companyId != null && !error && positions.length === 0 && !showBlockingSpinner ? (
         <p className="entity-zone__empty">В матрице пока нет данных.</p>
       ) : null}
 
-      {!loading && positions.length > 0 ? (
-        <div className="entity-zone__grid entity-zone__grid--idp">
+      {positions.length > 0 ? (
+        <div
+          className={cn(
+            'entity-zone__results-surface',
+            isRefreshing && 'entity-zone__results-surface--refreshing',
+          )}
+          aria-busy={isRefreshing || undefined}
+        >
+          <div className="entity-zone__grid entity-zone__grid--idp">
           {positions.map((row) => {
             const p = row.position
             const grades = Array.isArray(row.grades) ? row.grades : []
@@ -482,7 +494,7 @@ export function GradeModelPage() {
                         }}
                         disabled={submitting || !p.is_active}
                       >
-                        −
+                        <TrashIcon aria-hidden />
                       </button>
                     </span>
                   ) : null}
@@ -490,6 +502,7 @@ export function GradeModelPage() {
               </SpotlightCard>
             )
           })}
+          </div>
         </div>
       ) : null}
 
@@ -534,9 +547,9 @@ export function GradeModelPage() {
                 </div>
 
                 {competencyActionError ? (
-                  <div className="entity-zone__error" role="alert">
+                  <InlineAlert variant="error" className="ui-alert--mb-sm">
                     {competencyActionError}
-                  </div>
+                  </InlineAlert>
                 ) : null}
 
                 {competencyListLoading ? (
@@ -577,7 +590,7 @@ export function GradeModelPage() {
                             onClick={() => setCompetencyToDelete(c.id)}
                             disabled={submitting}
                           >
-                            −
+                            <TrashIcon aria-hidden />
                           </button>
                         </span>
                       </div>
@@ -603,9 +616,9 @@ export function GradeModelPage() {
                 </div>
 
                 {competencyActionError ? (
-                  <div className="entity-zone__error" role="alert">
+                  <InlineAlert variant="error" className="ui-alert--mb-sm">
                     {competencyActionError}
-                  </div>
+                  </InlineAlert>
                 ) : null}
 
                 <div className="entity-zone__filters">
@@ -689,11 +702,7 @@ export function GradeModelPage() {
               </button>
             </div>
 
-            {actionError ? (
-              <div className="entity-zone__error" role="alert">
-                {actionError}
-              </div>
-            ) : null}
+            {actionError ? <InlineAlert variant="error" className="ui-alert--mb-sm">{actionError}</InlineAlert> : null}
 
             <div className="entity-zone__filters">
               <label className="entity-zone__field">

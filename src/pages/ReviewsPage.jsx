@@ -5,7 +5,10 @@ import { useAuth } from '../auth/useAuth.js'
 import { hasDirectorRole, hasGeneralDirectorRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
+import { InlineAlert } from '../components/ui/Alert.jsx'
 import { SelectDropdown } from '../components/ui/SelectDropdown.jsx'
+import { useDisplayWhileRefreshing } from '../hooks/useDisplayWhileRefreshing.js'
+import { cn } from '../lib/utils.js'
 import './pages.css'
 import './EntityZone.css'
 
@@ -58,6 +61,7 @@ export function ReviewsPage() {
   const isGeneralDirector = hasGeneralDirectorRole(roles)
 
   const [myDepartmentId, setMyDepartmentId] = useState(/** @type {number | null} */ (null))
+  const [myDepartmentLookupDone, setMyDepartmentLookupDone] = useState(() => employeeIdFromJwt == null)
   const [scheduleEmployeeId, setScheduleEmployeeId] = useState('')
   const [scheduleAt, setScheduleAt] = useState(() => defaultFutureDatetimeLocal())
   const [openFinalReviewEmployeeIds, setOpenFinalReviewEmployeeIds] = useState(
@@ -67,6 +71,10 @@ export function ReviewsPage() {
   const [scheduleError, setScheduleError] = useState(/** @type {string | null} */ (null))
   const [scheduleInfo, setScheduleInfo] = useState(/** @type {string | null} */ (null))
   const [scheduleAdvisories, setScheduleAdvisories] = useState(/** @type {string[] | null} */ (null))
+
+  const [scheduleEligibleIds, setScheduleEligibleIds] = useState(/** @type {Set<number> | null} */ (null))
+  const [scheduleEligibleLoading, setScheduleEligibleLoading] = useState(false)
+  const [scheduleEligibleLoadError, setScheduleEligibleLoadError] = useState(/** @type {string | null} */ (null))
 
   const [employeeNameLike, setEmployeeNameLike] = useState('')
   const [status, setStatus] = useState('')
@@ -105,8 +113,10 @@ export function ReviewsPage() {
   useEffect(() => {
     if (employeeIdFromJwt == null) {
       setMyDepartmentId(null)
+      setMyDepartmentLookupDone(true)
       return
     }
+    setMyDepartmentLookupDone(false)
     let cancelled = false
     employeesApi
       .fetchEmployeeById(employeeIdFromJwt)
@@ -122,6 +132,11 @@ export function ReviewsPage() {
           setMyDepartmentId(null)
         }
       })
+      .finally(() => {
+        if (!cancelled) {
+          setMyDepartmentLookupDone(true)
+        }
+      })
     return () => {
       cancelled = true
     }
@@ -130,15 +145,49 @@ export function ReviewsPage() {
   const employeeNameMap = useMemo(() => buildEmployeeNameMap(employees), [employees])
 
   const scheduleEmployeeOptions = useMemo(() => {
-    if (!Array.isArray(employees)) {
+    if (!Array.isArray(employees) || scheduleEligibleIds == null) {
       return []
     }
-    let list = employees.filter((e) => e && e.is_active !== false)
+    let list = employees.filter((e) => e && e.is_active !== false && scheduleEligibleIds.has(e.id))
     if (!isGeneralDirector && myDepartmentId != null) {
       list = list.filter((e) => Number(e.department_id) === myDepartmentId)
     }
     return list.slice().sort((a, b) => String(a.full_name ?? '').localeCompare(String(b.full_name ?? ''), 'ru'))
-  }, [employees, isGeneralDirector, myDepartmentId])
+  }, [employees, isGeneralDirector, myDepartmentId, scheduleEligibleIds])
+
+  const loadScheduleEligibleIds = useCallback(async () => {
+    if (!canScheduleFinalReview || companyId == null || !myDepartmentLookupDone) {
+      return
+    }
+    setScheduleEligibleLoading(true)
+    setScheduleEligibleLoadError(null)
+    try {
+      const departmentParam = !isGeneralDirector && myDepartmentId != null ? myDepartmentId : undefined
+      const ids = await reviewCyclesApi.fetchFinalPromotionScheduleEligibleEmployeeIds({
+        company_id: companyId,
+        department_id: departmentParam,
+      })
+      setScheduleEligibleIds(new Set(ids.map((id) => Math.trunc(Number(id)))))
+    } catch {
+      setScheduleEligibleIds(null)
+      setScheduleEligibleLoadError('Не удалось загрузить список сотрудников, доступных для собеседования.')
+    } finally {
+      setScheduleEligibleLoading(false)
+    }
+  }, [canScheduleFinalReview, companyId, myDepartmentLookupDone, isGeneralDirector, myDepartmentId])
+
+  useEffect(() => {
+    if (!canScheduleFinalReview || companyId == null) {
+      setScheduleEligibleIds(null)
+      setScheduleEligibleLoading(false)
+      setScheduleEligibleLoadError(null)
+      return
+    }
+    if (!myDepartmentLookupDone) {
+      return
+    }
+    void loadScheduleEligibleIds()
+  }, [canScheduleFinalReview, companyId, myDepartmentLookupDone, loadScheduleEligibleIds])
 
   const loadOpenFinalReviews = useCallback(async () => {
     if (!canScheduleFinalReview || companyId == null) {
@@ -243,7 +292,7 @@ export function ReviewsPage() {
       }
       setScheduleEmployeeId('')
       setScheduleAt(defaultFutureDatetimeLocal())
-      await Promise.all([load(), loadOpenFinalReviews()])
+      await Promise.all([load(), loadOpenFinalReviews(), loadScheduleEligibleIds()])
       navigate(`/reviews/${result.review_cycle_id}`)
     } catch (e) {
       if (e instanceof ApiError) setScheduleError(e.message)
@@ -253,6 +302,8 @@ export function ReviewsPage() {
       setScheduleBusy(false)
     }
   }
+
+  const { displayData: displayItems, showBlockingSpinner, isRefreshing } = useDisplayWhileRefreshing(items, loading)
 
   return (
     <article className="page">
@@ -267,24 +318,29 @@ export function ReviewsPage() {
       <p className="page__lead">Плановые и завершённые собеседования на повышение. Нажмите на карточку, чтобы открыть детали.</p>
 
       {companyId == null ? (
-        <div className="entity-zone__error" role="status">
+        <InlineAlert variant="warning" role="status">
           Не удалось определить компанию.
-        </div>
+        </InlineAlert>
       ) : null}
 
       {canScheduleFinalReview ? (
         <section className="entity-zone__idp-section" style={{ marginBottom: '1.5rem' }}>
           <h2 className="entity-zone__idp-section-title">Назначить собеседование на повышение</h2>
           <p className="entity-zone__idp-muted" style={{ marginBottom: '0.75rem' }}>
-            Доступно после завершения ИПР сотрудника. Рекомендации политики не блокируют назначение.
+            Доступно после завершения ИПР сотрудника. В списке ниже — только те, кому собеседование можно назначить сейчас (есть завершённый ИПР в основе, нет открытого запланированного собеседования). Рекомендации политики не блокируют назначение.
             {!isGeneralDirector && myDepartmentId != null
               ? ' Список ограничен сотрудниками вашего отдела.'
               : ''}
           </p>
           {scheduleError ? (
-            <div className="entity-zone__error" role="alert" style={{ marginBottom: '0.75rem' }}>
+            <InlineAlert variant="error" className="ui-alert--mb-sm">
               {scheduleError}
-            </div>
+            </InlineAlert>
+          ) : null}
+          {scheduleEligibleLoadError ? (
+            <InlineAlert variant="warning" className="ui-alert--mb-sm" role="status">
+              {scheduleEligibleLoadError}
+            </InlineAlert>
           ) : null}
           {scheduleInfo ? (
             <p className="entity-zone__idp-muted" style={{ marginBottom: '0.75rem' }}>
@@ -298,14 +354,29 @@ export function ReviewsPage() {
               ))}
             </ul>
           ) : null}
-          <form className="entity-zone__filters" onSubmit={(ev) => void handleScheduleFinalReview(ev)}>
+          <form
+            className="entity-zone__filters entity-zone__filters--reviews-schedule"
+            onSubmit={(ev) => void handleScheduleFinalReview(ev)}
+          >
             <label className="entity-zone__field entity-zone__field--grow">
               <span className="entity-zone__field-label">Сотрудник</span>
               <SelectDropdown
                 value={scheduleEmployeeId}
                 onChange={setScheduleEmployeeId}
-                placeholder="Выберите сотрудника"
-                disabled={scheduleBusy || scheduleEmployeeOptions.length === 0}
+                placeholder={
+                  !myDepartmentLookupDone || scheduleEligibleLoading
+                    ? 'Загрузка списка…'
+                    : scheduleEligibleLoadError
+                      ? 'Список недоступен'
+                      : 'Выберите сотрудника'
+                }
+                disabled={
+                  scheduleBusy ||
+                  !myDepartmentLookupDone ||
+                  scheduleEligibleLoading ||
+                  scheduleEligibleLoadError != null ||
+                  scheduleEmployeeOptions.length === 0
+                }
                 options={[
                   { value: '', label: 'Выберите сотрудника' },
                   ...scheduleEmployeeOptions.map((employee) => {
@@ -320,7 +391,7 @@ export function ReviewsPage() {
                 ]}
               />
             </label>
-            <label className="entity-zone__field">
+            <label className="entity-zone__field entity-zone__field--datetime-narrow">
               <span className="entity-zone__field-label">Плановая дата и время</span>
               <input
                 className="entity-zone__input"
@@ -330,26 +401,44 @@ export function ReviewsPage() {
                 disabled={scheduleBusy}
               />
             </label>
-            <div className="entity-zone__actions" style={{ alignSelf: 'end' }}>
+            <label className="entity-zone__field">
+              <span className="entity-zone__field-label" aria-hidden="true">
+                {'\u00a0'}
+              </span>
               <button
-                className="entity-zone__button entity-zone__button--primary"
+                className="entity-zone__button entity-zone__button--primary entity-zone__button--align-field"
                 type="submit"
-                disabled={scheduleBusy || employeeIdFromJwt == null || scheduleEmployeeOptions.length === 0}
+                disabled={
+                  scheduleBusy ||
+                  employeeIdFromJwt == null ||
+                  !myDepartmentLookupDone ||
+                  scheduleEligibleLoading ||
+                  scheduleEligibleLoadError != null ||
+                  scheduleEmployeeOptions.length === 0
+                }
               >
                 {scheduleBusy ? 'Назначение…' : 'Назначить собеседование'}
               </button>
-            </div>
+            </label>
           </form>
-          {scheduleEmployeeOptions.length === 0 ? (
+          {scheduleEligibleLoadError ? null : !myDepartmentLookupDone ? (
             <p className="entity-zone__idp-muted" style={{ marginTop: '0.5rem' }}>
-              Нет сотрудников для назначения собеседования в вашей зоне видимости.
+              Определение зоны видимости…
+            </p>
+          ) : scheduleEligibleLoading && scheduleEmployeeOptions.length === 0 ? (
+            <p className="entity-zone__idp-muted" style={{ marginTop: '0.5rem' }}>
+              Загрузка списка доступных сотрудников…
+            </p>
+          ) : !scheduleEligibleLoading && scheduleEligibleIds != null && scheduleEmployeeOptions.length === 0 ? (
+            <p className="entity-zone__idp-muted" style={{ marginTop: '0.5rem' }}>
+              Нет сотрудников, которым сейчас можно назначить собеседование: нет подходящего завершённого ИПР в основе или уже есть запланированное собеседование.
             </p>
           ) : null}
         </section>
       ) : null}
 
       <form
-        className="entity-zone__filters"
+        className="entity-zone__filters entity-zone__filters--reviews-filters"
         onSubmit={(ev) => {
           ev.preventDefault()
           void load()
@@ -368,11 +457,11 @@ export function ReviewsPage() {
           <span className="entity-zone__field-label">Статус</span>
           <SelectDropdown value={status} onChange={setStatus} options={STATUS_FILTER_OPTIONS} />
         </label>
-        <label className="entity-zone__field">
+        <label className="entity-zone__field entity-zone__field--date-narrow">
           <span className="entity-zone__field-label">Период: с</span>
           <input className="entity-zone__input" type="date" value={dateFrom} onChange={(ev) => setDateFrom(ev.target.value)} />
         </label>
-        <label className="entity-zone__field">
+        <label className="entity-zone__field entity-zone__field--date-narrow">
           <span className="entity-zone__field-label">Период: по</span>
           <input className="entity-zone__input" type="date" value={dateTo} onChange={(ev) => setDateTo(ev.target.value)} />
         </label>
@@ -384,21 +473,24 @@ export function ReviewsPage() {
         </button>
       </div>
 
-      {error ? (
-        <div className="entity-zone__error" role="alert">
-          {error}
-        </div>
-      ) : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
 
-      {loading ? <p className="entity-zone__loading">Загрузка…</p> : null}
+      {showBlockingSpinner ? <p className="entity-zone__loading">Загрузка…</p> : null}
 
-      {!loading && items && items.length === 0 && !error ? (
+      {companyId != null && displayItems && displayItems.length === 0 && !error ? (
         <p className="entity-zone__empty">Собеседования не найдены.</p>
       ) : null}
 
-      {!loading && items && items.length > 0 ? (
-        <div className="entity-zone__grid entity-zone__grid--idp">
-          {items.map((item) => {
+      {displayItems && displayItems.length > 0 ? (
+        <div
+          className={cn(
+            'entity-zone__results-surface',
+            isRefreshing && 'entity-zone__results-surface--refreshing',
+          )}
+          aria-busy={isRefreshing || undefined}
+        >
+          <div className="entity-zone__grid entity-zone__grid--idp">
+          {displayItems.map((item) => {
             const employeeName = employeeNameMap.get(item.employee_id) ?? 'Сотрудник'
             const typeKey = String(item.review_type ?? '').toUpperCase()
             const typeLabel = REVIEW_TYPE_LABEL[/** @type {keyof typeof REVIEW_TYPE_LABEL} */ (typeKey)] ?? item.review_type
@@ -440,6 +532,7 @@ export function ReviewsPage() {
               </article>
             )
           })}
+          </div>
         </div>
       ) : null}
     </article>

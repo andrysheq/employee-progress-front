@@ -3,6 +3,9 @@ import { Link, useParams } from 'react-router-dom'
 import { ApiError, promotionDecisionsApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
 import { hasDirectorRole } from '../auth/roleChecks.js'
+import { InlineAlert } from '../components/ui/Alert.jsx'
+import { useDisplayWhileRefreshing } from '../hooks/useDisplayWhileRefreshing.js'
+import { cn } from '../lib/utils.js'
 import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
 import './pages.css'
 import './EntityZone.css'
@@ -66,8 +69,10 @@ export function PromotionDecisionDetailsPage() {
     }
   }, [decisionId, canRead])
 
-  const decisionKey = item ? String(item.decision).toUpperCase() : ''
-  const decisionLabel = DECISION_LABEL[/** @type {keyof typeof DECISION_LABEL} */ (decisionKey)] ?? item?.decision
+  const { displayData: displayItem, showBlockingSpinner, isRefreshing } = useDisplayWhileRefreshing(item, loading)
+
+  const decisionKey = displayItem ? String(displayItem.decision).toUpperCase() : ''
+  const decisionLabel = DECISION_LABEL[/** @type {keyof typeof DECISION_LABEL} */ (decisionKey)] ?? displayItem?.decision
 
   return (
     <article className="page">
@@ -78,35 +83,53 @@ export function PromotionDecisionDetailsPage() {
       </ol>
       <h1 className="page__title">Кадровое решение</h1>
 
-      {error ? <div className="entity-zone__error" role="alert">{error}</div> : null}
-      {loading ? <p className="entity-zone__loading">Загрузка…</p> : null}
+      {error ? <InlineAlert variant="error">{error}</InlineAlert> : null}
+      {showBlockingSpinner ? <p className="entity-zone__loading">Загрузка…</p> : null}
 
-      {!loading && item ? (
+      {displayItem ? (
+        <div
+          className={cn(
+            'entity-zone__results-surface',
+            isRefreshing && 'entity-zone__results-surface--refreshing',
+          )}
+          aria-busy={isRefreshing || undefined}
+        >
         <section className="entity-zone__summary">
           <header className="entity-zone__idp-hero">
             <div className="entity-zone__idp-hero-main">
-              <p className="entity-zone__idp-hero-name">{item.employee_name}</p>
+              <p className="entity-zone__idp-hero-name">{displayItem.employee_name}</p>
               <div className="entity-zone__idp-chip-row" style={{ marginTop: '0.35rem' }}>
                 <span className="entity-zone__idp-chip">
-                  {item.from_grade_code} → {item.to_grade_code ?? '—'}
+                  {displayItem.from_grade_code} → {displayItem.to_grade_code ?? '—'}
                 </span>
               </div>
               <p className="entity-zone__idp-hero-meta" style={{ marginTop: '0.5rem', flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem' }}>
-                <span>Принято: {formatDateTimeRuNoSeconds(item.decided_at)}</span>
+                <span>Принято: {formatDateTimeRuNoSeconds(displayItem.decided_at)}</span>
               </p>
             </div>
-            <span className={decisionChipClass(item.decision)}>{decisionLabel}</span>
+            <span className={decisionChipClass(displayItem.decision)}>{decisionLabel}</span>
           </header>
+
+          {String(displayItem.decision).toUpperCase() === 'APPROVED' &&
+          displayItem.agreed_salary_rub_month != null &&
+          displayItem.agreed_salary_rub_month !== '' ? (
+            <section className="entity-zone__idp-section">
+              <h2 className="entity-zone__idp-section-title">Согласованный оклад</h2>
+              <p className="entity-zone__idp-muted">
+                <strong>{Number(displayItem.agreed_salary_rub_month).toLocaleString('ru-RU')} ₽</strong> в месяц
+              </p>
+            </section>
+          ) : null}
 
           <section className="entity-zone__idp-section">
             <h2 className="entity-zone__idp-section-title">Обоснование</h2>
-            <p className="entity-zone__idp-muted" style={{ whiteSpace: 'pre-wrap' }}>{item.rationale || '—'}</p>
+            <p className="entity-zone__idp-muted" style={{ whiteSpace: 'pre-wrap' }}>{displayItem.rationale || '—'}</p>
           </section>
 
-          {item.improvement_plan_summary ? (
+          {displayItem.improvement_plan_summary ? (
             <section className="entity-zone__idp-section">
               <h2 className="entity-zone__idp-section-title">План улучшений</h2>
-              <p className="entity-zone__idp-muted" style={{ whiteSpace: 'pre-wrap' }}>{item.improvement_plan_summary}</p>
+              <p className="entity-zone__idp-muted" style={{ whiteSpace: 'pre-wrap' }}>{displayItem.improvement_plan_summary}</p>
             </section>
           ) : null}
 
@@ -115,24 +138,25 @@ export function PromotionDecisionDetailsPage() {
             <div className="entity-zone__idp-cards">
               <article className="entity-zone__idp-card entity-zone__context-panel">
                 <p className="entity-zone__idp-muted">
-                  Принял: <strong className="entity-zone__context-strong">{item.decided_by_name}</strong>
+                  Принял: <strong className="entity-zone__context-strong">{displayItem.decided_by_name}</strong>
                 </p>
                 <p className="entity-zone__idp-muted">
                   Сотрудник:{' '}
-                  <Link className="entity-zone__inline-link" to={`/employees/${item.employee_id}`}>
-                    {item.employee_name}
+                  <Link className="entity-zone__inline-link" to={`/employees/${displayItem.employee_id}`}>
+                    {displayItem.employee_name}
                   </Link>
                 </p>
                 <p className="entity-zone__idp-muted">
                   Собеседование:{' '}
-                  <Link className="entity-zone__inline-link" to={`/reviews/${item.review_cycle_id}`}>
-                    #{item.review_cycle_id}
+                  <Link className="entity-zone__inline-link" to={`/reviews/${displayItem.review_cycle_id}`}>
+                    #{displayItem.review_cycle_id}
                   </Link>
                 </p>
               </article>
             </div>
           </section>
         </section>
+        </div>
       ) : null}
     </article>
   )
