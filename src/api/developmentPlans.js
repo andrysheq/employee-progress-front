@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost } from './client.js'
+import { apiDelete, apiGet, apiPatch, apiPost } from './client.js'
 import { buildRegistryQuery, normalizePage } from './registry.js'
 
 /**
@@ -102,6 +102,18 @@ export function fetchTaskProgressHistory(planId, taskId) {
 /**
  * @param {number} planId
  * @param {number} taskId
+ * @param {{ progress_percent: number, comment?: string | null }} body
+ * @returns {Promise<{ entry_id: number, task_id: number, progress_percent: number, comment: string | null, current_task_status: string, created_at: string }>}
+ */
+export function recordDevelopmentPlanTaskProgress(planId, taskId, body) {
+  return /** @type {Promise<any>} */ (
+    apiPost(`/development-plans/${Math.trunc(planId)}/tasks/${Math.trunc(taskId)}/progress`, body)
+  )
+}
+
+/**
+ * @param {number} planId
+ * @param {number} taskId
  * @returns {Promise<Array<{ id: number, task_id: number, comment: string, created_at: string, created_by_employee_id: number }>>}
  */
 export function fetchTaskComments(planId, taskId) {
@@ -115,6 +127,77 @@ export function fetchTaskComments(planId, taskId) {
  */
 export function fetchTaskAttachments(planId, taskId) {
   return apiGet(`/development-plans/${Math.trunc(planId)}/tasks/${Math.trunc(taskId)}/attachments`)
+}
+
+/**
+ * @param {number} planId
+ * @param {number} taskId
+ * @param {{ file_name: string, content_type?: string | null }} body
+ * @returns {Promise<{ object_key: string, upload_url: string, expires_at: string }>}
+ */
+export function requestTaskAttachmentUploadUrl(planId, taskId, body) {
+  return /** @type {Promise<any>} */ (
+    apiPost(`/development-plans/${Math.trunc(planId)}/tasks/${Math.trunc(taskId)}/attachments/upload-url`, body)
+  )
+}
+
+/**
+ * @param {number} planId
+ * @param {number} taskId
+ * @param {{ object_key: string, file_name: string }} body
+ * @returns {Promise<{ id: number, file_name: string, content_type: string, size_bytes: number, created_at: string, download_url: string }>}
+ */
+export function completeTaskAttachmentUpload(planId, taskId, body) {
+  return /** @type {Promise<any>} */ (
+    apiPost(`/development-plans/${Math.trunc(planId)}/tasks/${Math.trunc(taskId)}/attachments/complete`, body)
+  )
+}
+
+/**
+ * Presigned PUT в MinIO, затем фиксация вложения в employee-progress.
+ * @param {number} planId
+ * @param {number} taskId
+ * @param {File} file
+ */
+export async function uploadTaskAttachmentViaPresign(planId, taskId, file) {
+  const fileName = file.name && file.name.trim() !== '' ? file.name : 'file'
+  const contentType =
+    file.type && String(file.type).trim() !== '' ? file.type : 'application/octet-stream'
+  const presign = await requestTaskAttachmentUploadUrl(planId, taskId, {
+    file_name: fileName,
+    content_type: contentType,
+  })
+  const uploadUrl = presign.upload_url ?? presign.uploadUrl
+  const objectKey = presign.object_key ?? presign.objectKey
+  if (typeof uploadUrl !== 'string' || typeof objectKey !== 'string') {
+    throw new Error('Сервер не вернул данные для загрузки файла')
+  }
+  const putRes = await fetch(uploadUrl, {
+    method: 'PUT',
+    body: file,
+    headers: { 'Content-Type': contentType },
+    credentials: 'omit',
+  })
+  if (!putRes.ok) {
+    const hint = await putRes.text().catch(() => '')
+    throw new Error(hint || `Загрузка в хранилище не удалась (HTTP ${putRes.status})`)
+  }
+  return completeTaskAttachmentUpload(planId, taskId, {
+    object_key: objectKey,
+    file_name: fileName,
+  })
+}
+
+/**
+ * @param {number} planId
+ * @param {number} taskId
+ * @param {number} attachmentId
+ */
+export function deleteTaskAttachment(planId, taskId, attachmentId) {
+  return apiDelete(
+    `/development-plans/${Math.trunc(planId)}/tasks/${Math.trunc(taskId)}/attachments/${Math.trunc(attachmentId)}`,
+    { parseAs: 'void' },
+  )
 }
 
 /**

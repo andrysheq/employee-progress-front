@@ -166,7 +166,7 @@ export function scheduleFinalPromotionReview(employeeId, body) {
 /**
  * @typedef {object} FinalPromotionDecisionRequest
  * @property {number} director_employee_id
- * @property {'APPROVED' | 'REJECTED'} decision
+ * @property {'APPROVED_BY_DEPARTMENT_DIRECTOR' | 'REJECTED'} decision
  * @property {number | null | undefined} [target_grade_id]
  * @property {string} rationale
  * @property {string | null | undefined} [improvement_plan_summary]
@@ -189,6 +189,25 @@ export function scheduleFinalPromotionReview(employeeId, body) {
 export function makeFinalPromotionDecision(reviewCycleId, body) {
   return /** @type {Promise<FinalPromotionDecisionResultView>} */ (
     apiPost(`/review-cycles/${Math.trunc(reviewCycleId)}/promotion-decision`, body)
+  )
+}
+
+/**
+ * @typedef {object} GeneralDirectorPromotionConfirmationRequest
+ * @property {number} general_director_employee_id
+ * @property {'APPROVED_BY_GENERAL_DIRECTOR' | 'REJECTED'} decision
+ * @property {string} rationale
+ * @property {string | null | undefined} [improvement_plan_summary]
+ */
+
+/**
+ * @param {number} reviewCycleId
+ * @param {GeneralDirectorPromotionConfirmationRequest} body
+ * @returns {Promise<FinalPromotionDecisionResultView>}
+ */
+export function confirmGeneralDirectorPromotionDecision(reviewCycleId, body) {
+  return /** @type {Promise<FinalPromotionDecisionResultView>} */ (
+    apiPost(`/review-cycles/${Math.trunc(reviewCycleId)}/promotion-decision/general-director-confirmation`, body)
   )
 }
 

@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { RequireAuth } from '../auth/RequireAuth.jsx'
+import { RequireInterviewsAccess } from '../auth/RequireInterviewsAccess.jsx'
 import { AppShell } from '../layout/AppShell'
 import { LoginPage } from '../pages/LoginPage'
 import { HomePage } from '../pages/HomePage'
@@ -44,8 +45,22 @@ export const router = createBrowserRouter([
       { path: 'development-plans/new', element: <DevelopmentPlanCreatePage /> },
       { path: 'development-plans/:planId', element: <DevelopmentPlanDetailsPage /> },
       { path: 'development-plans/:planId/tasks/:taskId', element: <DevelopmentPlanTaskPage /> },
-      { path: 'reviews', element: <ReviewsPage /> },
-      { path: 'reviews/:reviewCycleId', element: <ReviewCycleDetailsPage /> },
+      {
+        path: 'reviews',
+        element: (
+          <RequireInterviewsAccess>
+            <ReviewsPage />
+          </RequireInterviewsAccess>
+        ),
+      },
+      {
+        path: 'reviews/:reviewCycleId',
+        element: (
+          <RequireInterviewsAccess>
+            <ReviewCycleDetailsPage />
+          </RequireInterviewsAccess>
+        ),
+      },
       { path: 'promotion-decisions', element: <PromotionDecisionsPage /> },
       { path: 'promotion-decisions/:decisionId', element: <PromotionDecisionDetailsPage /> },
       { path: 'reports', element: <ReportsPage /> },

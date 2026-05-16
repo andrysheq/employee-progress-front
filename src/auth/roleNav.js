@@ -34,21 +34,19 @@ const SAFE_DEFAULT_PATHS = new Set([
   '/employees',
   '/policies',
   '/development-plans',
-  '/reviews',
 ])
 
 const DEPARTMENT_DIRECTOR_PATHS = new Set([
   ...SAFE_DEFAULT_PATHS,
+  '/reviews',
   '/promotion-decisions',
   '/reports',
 ])
 
-const TEAM_LEAD_PATHS = new Set([
-  ...SAFE_DEFAULT_PATHS,
-  '/reports',
-])
+/** Тимлид: без раздела «Собеседования» (см. также {@link getVisibleNavItems} — отрезка при роли «Сотрудник»). */
+const TEAM_LEAD_PATHS = new Set([...SAFE_DEFAULT_PATHS, '/reports'])
 
-const EMPLOYEE_PATHS = SAFE_DEFAULT_PATHS
+const EMPLOYEE_PATHS = new Set([...SAFE_DEFAULT_PATHS, '/reviews'])
 
 /**
  * @param {unknown} raw
@@ -103,9 +101,21 @@ export function getVisibleNavItems(roles) {
     }
   }
 
+  let visible
   if (!hasKnownRole || allowed.size === 0) {
-    return mainNavItems.filter((item) => SAFE_DEFAULT_PATHS.has(item.to))
+    visible = mainNavItems.filter((item) => SAFE_DEFAULT_PATHS.has(item.to))
+  } else {
+    visible = mainNavItems.filter((item) => allowed.has(item.to))
   }
 
-  return mainNavItems.filter((item) => allowed.has(item.to))
+  const hasTeamLead = list.some((r) => hasRoleAlias(r, ROLE_ALIASES.TEAM_LEAD))
+  const hasDirector =
+    list.some((r) => hasRoleAlias(r, ROLE_ALIASES.DEPARTMENT_DIRECTOR)) ||
+    list.some((r) => hasRoleAlias(r, ROLE_ALIASES.GENERAL_DIRECTOR))
+
+  if (hasTeamLead && !hasDirector) {
+    return visible.filter((item) => item.to !== '/reviews')
+  }
+
+  return visible
 }

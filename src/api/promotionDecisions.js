@@ -2,7 +2,7 @@ import { apiGet, apiPost } from './client.js'
 import { buildRegistryQuery, normalizePage } from './registry.js'
 
 /**
- * @typedef {'APPROVED' | 'REJECTED'} PromotionDecisionType
+ * @typedef {'APPROVED_BY_DEPARTMENT_DIRECTOR' | 'APPROVED_BY_GENERAL_DIRECTOR' | 'REJECTED' | string} PromotionDecisionType
  */
 
 /**
@@ -19,6 +19,10 @@ import { buildRegistryQuery, normalizePage } from './registry.js'
  * @property {number} decided_by_id
  * @property {string} decided_by_name
  * @property {string} decided_at
+ * @property {number | null} [ceo_decided_by_id]
+ * @property {string | null} [ceo_decided_by_name]
+ * @property {string | null} [ceo_decided_at]
+ * @property {string | null} [ceo_rationale]
  * @property {number | null} [agreed_salary_rub_month]
  */
 

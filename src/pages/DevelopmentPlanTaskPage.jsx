@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, developmentPlansApi, employeesApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
@@ -89,14 +89,23 @@ export function DevelopmentPlanTaskPage() {
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const fileInputRef = useRef(/** @type {HTMLInputElement | null} */ (null))
 
   const [newComment, setNewComment] = useState('')
   const [commentBusy, setCommentBusy] = useState(false)
   const [commentError, setCommentError] = useState(null)
 
+  const [attachBusy, setAttachBusy] = useState(false)
+  const [attachError, setAttachError] = useState(null)
+
   const [doneScore, setDoneScore] = useState('8')
   const [doneBusy, setDoneBusy] = useState(false)
   const [doneError, setDoneError] = useState(null)
+
+  const [progressPercentInput, setProgressPercentInput] = useState('0')
+  const [progressComment, setProgressComment] = useState('')
+  const [progressBusy, setProgressBusy] = useState(false)
+  const [progressError, setProgressError] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -177,11 +186,30 @@ export function DevelopmentPlanTaskPage() {
     Number(plan.team_lead_id) === Number(employeeIdFromJwt)
 
   const st = task ? String(task.status ?? '').toUpperCase() : ''
+  const rawTlScore = task?.team_lead_task_score
+  const hasTeamLeadTaskScore =
+    rawTlScore != null && rawTlScore !== '' && Number.isFinite(Number(rawTlScore))
+  const teamLeadNeedsScoreWhileDone =
+    isAssignedTeamLead && planExecutionReady && task != null && st === 'DONE' && !hasTeamLeadTaskScore
+  const canTeamLeadMarkDoneWithScore =
+    isAssignedTeamLead && planExecutionReady && task != null && st !== 'DONE'
+  const showTeamLeadScorePanel = canTeamLeadMarkDoneWithScore || teamLeadNeedsScoreWhileDone
+
+  const canUploadTaskAttachment = planExecutionReady && task != null
+
+  /** По матрице OAuth удалять вложения может только роль тимлида (1002). */
+  const canDeleteTaskAttachment =
+    isAssignedTeamLead && hasTeamLeadRole(roles) && planExecutionReady && task != null
+
   const canAddTaskComment =
     planExecutionReady &&
     task != null &&
     st !== 'DONE' &&
     (isPlanEmployee || isAssignedTeamLead)
+
+  /** Прогресс фиксирует только владелец ИПР (на бэкенде запись всегда от имени сотрудника-плана). */
+  const canRecordTaskProgress =
+    planExecutionReady && task != null && st !== 'DONE' && isPlanEmployee
   const statusLabel = TASK_STATUS_LABEL[/** @type {keyof typeof TASK_STATUS_LABEL} */ (st)] ?? task?.status
   const tt = task ? String(task.task_type ?? '').toUpperCase() : ''
   const typeLabel = task
@@ -266,6 +294,90 @@ export function DevelopmentPlanTaskPage() {
                 ))
               )}
             </div>
+            {canRecordTaskProgress ? (
+              <div style={{ marginTop: '1rem' }}>
+                <h3 className="entity-zone__idp-section-title" style={{ fontSize: '1rem' }}>
+                  Новая запись в истории
+                </h3>
+                <p className="entity-zone__idp-muted" style={{ marginBottom: '0.5rem' }}>
+                  Укажите процент выполнения задачи (0–100). Статус задачи обновится автоматически; при 100% задача
+                  перейдёт в «Выполнена» (при необходимости оценка тимлида задаётся в блоке ниже).
+                </p>
+                <label className="entity-zone__field" style={{ maxWidth: '12rem' }}>
+                  <span className="entity-zone__field-label">Процент выполнения</span>
+                  <input
+                    className="entity-zone__input"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={progressPercentInput}
+                    onChange={(ev) => setProgressPercentInput(ev.target.value)}
+                  />
+                </label>
+                <label className="entity-zone__field" style={{ marginTop: '0.75rem' }}>
+                  <span className="entity-zone__field-label">Комментарий (необязательно)</span>
+                  <textarea
+                    className="entity-zone__input"
+                    rows={2}
+                    value={progressComment}
+                    onChange={(ev) => setProgressComment(ev.target.value)}
+                    placeholder="Кратко опишите, что сделано…"
+                  />
+                </label>
+                {progressError ? (
+                  <InlineAlert variant="error" className="ui-alert--field-hint">
+                    {progressError}
+                  </InlineAlert>
+                ) : null}
+                <div className="entity-zone__actions" style={{ marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="entity-zone__button entity-zone__button--primary"
+                    disabled={progressBusy || !planId || !taskId}
+                    onClick={async () => {
+                      if (!planId || !taskId) return
+                      const pct = Math.trunc(Number(progressPercentInput))
+                      if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+                        setProgressError('Введите целое число от 0 до 100')
+                        return
+                      }
+                      setProgressBusy(true)
+                      setProgressError(null)
+                      try {
+                        const res = await developmentPlansApi.recordDevelopmentPlanTaskProgress(
+                          Number(planId),
+                          Number(taskId),
+                          {
+                            progress_percent: pct,
+                            comment: progressComment.trim() !== '' ? progressComment.trim() : null,
+                          },
+                        )
+                        const nextStatus =
+                          typeof res?.current_task_status === 'string' ? res.current_task_status : null
+                        setTask((prev) => {
+                          if (!prev) return prev
+                          return nextStatus ? { ...prev, status: nextStatus } : prev
+                        })
+                        setProgressComment('')
+                        const list = await developmentPlansApi.fetchTaskProgressHistory(
+                          Number(planId),
+                          Number(taskId),
+                        )
+                        setProgressHistory(Array.isArray(list) ? list : [])
+                      } catch (e) {
+                        if (e instanceof ApiError) setProgressError(e.message)
+                        else if (e instanceof Error) setProgressError(e.message)
+                        else setProgressError('Не удалось сохранить прогресс')
+                      } finally {
+                        setProgressBusy(false)
+                      }
+                    }}
+                  >
+                    Сохранить прогресс
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </section>
 
           <section className="entity-zone__idp-section" aria-labelledby="task-comments-heading">
@@ -343,13 +455,15 @@ export function DevelopmentPlanTaskPage() {
             ) : null}
           </section>
 
-          {isAssignedTeamLead && planExecutionReady && task && st !== 'DONE' ? (
+          {showTeamLeadScorePanel ? (
             <section className="entity-zone__idp-section" aria-labelledby="task-tl-done-heading">
               <h2 id="task-tl-done-heading" className="entity-zone__idp-section-title">
-                Завершение задачи (тимлид)
+                {canTeamLeadMarkDoneWithScore ? 'Завершение задачи (тимлид)' : 'Оценка тимлида'}
               </h2>
               <p className="entity-zone__idp-muted">
-                Перевод в статус «Выполнена» с обязательной оценкой по шкале 1–10.
+                {canTeamLeadMarkDoneWithScore
+                  ? 'Перевод в статус «Выполнена» с обязательной оценкой по шкале 1–10.'
+                  : 'Задача уже завершена (в том числе если сотрудник отметил 100% в истории выполнения). Укажите оценку по шкале 1–10 — она участвует в расчётах по ИПР.'}
               </p>
               <label className="entity-zone__field" style={{ maxWidth: '12rem' }}>
                 <span className="entity-zone__field-label">Оценка (1–10)</span>
@@ -401,7 +515,7 @@ export function DevelopmentPlanTaskPage() {
                     }
                   }}
                 >
-                  Завершить задачу
+                  {canTeamLeadMarkDoneWithScore ? 'Завершить задачу' : 'Сохранить оценку'}
                 </button>
               </div>
             </section>
@@ -409,6 +523,49 @@ export function DevelopmentPlanTaskPage() {
 
           <section className="entity-zone__idp-section" aria-labelledby="task-attach-heading">
             <h2 id="task-attach-heading" className="entity-zone__idp-section-title">Вложения</h2>
+            {canUploadTaskAttachment ? (
+              <div style={{ marginBottom: '1rem' }}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="entity-zone__input"
+                  style={{ display: 'none' }}
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.7z,application/*"
+                  onChange={async (ev) => {
+                    const input = ev.target
+                    const file = input.files?.[0]
+                    input.value = ''
+                    if (!file || !planId || !taskId) return
+                    setAttachBusy(true)
+                    setAttachError(null)
+                    try {
+                      await developmentPlansApi.uploadTaskAttachmentViaPresign(Number(planId), Number(taskId), file)
+                      const list = await developmentPlansApi.fetchTaskAttachments(Number(planId), Number(taskId))
+                      setAttachments(Array.isArray(list) ? list : [])
+                    } catch (e) {
+                      if (e instanceof ApiError) setAttachError(e.message)
+                      else if (e instanceof Error) setAttachError(e.message)
+                      else setAttachError('Не удалось прикрепить файл')
+                    } finally {
+                      setAttachBusy(false)
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="entity-zone__button entity-zone__button--primary"
+                  disabled={attachBusy}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {attachBusy ? 'Загрузка…' : 'Прикрепить файл'}
+                </button>
+                {attachError ? (
+                  <InlineAlert variant="error" className="ui-alert--field-hint">
+                    {attachError}
+                  </InlineAlert>
+                ) : null}
+              </div>
+            ) : null}
             <div className="entity-zone__idp-cards">
               {attachments.length === 0 ? (
                 <p className="entity-zone__idp-muted">Файлов пока нет.</p>
@@ -419,14 +576,55 @@ export function DevelopmentPlanTaskPage() {
                       <a className="entity-zone__idp-link" href={x.download_url} target="_blank" rel="noreferrer">
                         {x.file_name}
                       </a>
+                      {canDeleteTaskAttachment ? (
+                        <button
+                          type="button"
+                          className="entity-zone__link"
+                          style={{
+                            marginLeft: '0.75rem',
+                            border: 'none',
+                            background: 'none',
+                            cursor: 'pointer',
+                            padding: 0,
+                            color: 'var(--destructive, #b42318)',
+                            textDecoration: 'underline',
+                          }}
+                          disabled={attachBusy}
+                          onClick={async () => {
+                            if (
+                              !planId ||
+                              !taskId ||
+                              !window.confirm('Удалить это вложение?')
+                            ) {
+                              return
+                            }
+                            setAttachBusy(true)
+                            setAttachError(null)
+                            try {
+                              await developmentPlansApi.deleteTaskAttachment(
+                                Number(planId),
+                                Number(taskId),
+                                Number(x.id),
+                              )
+                              const list = await developmentPlansApi.fetchTaskAttachments(
+                                Number(planId),
+                                Number(taskId),
+                              )
+                              setAttachments(Array.isArray(list) ? list : [])
+                            } catch (e) {
+                              if (e instanceof ApiError) setAttachError(e.message)
+                              else if (e instanceof Error) setAttachError(e.message)
+                              else setAttachError('Не удалось удалить файл')
+                            } finally {
+                              setAttachBusy(false)
+                            }
+                          }}
+                        >
+                          Удалить
+                        </button>
+                      ) : null}
                     </div>
                     <p className="entity-zone__idp-muted" style={{ marginTop: '0.35rem' }}>
-                      {x.content_type ?? '—'}
-                    </p>
-                    <p className="entity-zone__idp-muted" style={{ marginTop: '0.2rem' }}>
-                      {x.size_bytes != null ? `${x.size_bytes} байт` : '—'}
-                    </p>
-                    <p className="entity-zone__idp-muted" style={{ marginTop: '0.2rem' }}>
                       {formatDateTimeRuNoSeconds(x.created_at)}
                     </p>
                   </article>

@@ -32,6 +32,7 @@ export function DevelopmentPlanCreatePage() {
 
   const [employeeSearchInput, setEmployeeSearchInput] = useState('')
   const [debouncedEmployeeSearch, setDebouncedEmployeeSearch] = useState('')
+
   const [employeeSuggestions, setEmployeeSuggestions] = useState(
     /** @type {import('../api/employees.js').EmployeeView[]} */ ([]),
   )
@@ -49,11 +50,6 @@ export function DevelopmentPlanCreatePage() {
     periodEnd: '',
   })
   const [taskDrafts, setTaskDrafts] = useState(() => [newIdpTaskDraft()])
-
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedEmployeeSearch(employeeSearchInput.trim()), 320)
-    return () => window.clearTimeout(t)
-  }, [employeeSearchInput])
 
   useEffect(() => {
     let cancelled = false
@@ -113,6 +109,11 @@ export function DevelopmentPlanCreatePage() {
     }
   }, [employeeIdFromJwt, companyId])
 
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedEmployeeSearch(employeeSearchInput.trim()), 320)
+    return () => window.clearTimeout(t)
+  }, [employeeSearchInput])
+
   const loadMatrixPositionLabels = useCallback(async () => {
     if (companyId == null) {
       setPositionLabels({})
@@ -155,6 +156,7 @@ export function DevelopmentPlanCreatePage() {
     async function run() {
       if (companyId == null || teamLeadDepartmentId == null) {
         setEmployeeSuggestions([])
+        setSelectedEmployee(null)
         return
       }
       setSuggestLoading(true)
@@ -168,16 +170,25 @@ export function DevelopmentPlanCreatePage() {
         if (debouncedEmployeeSearch !== '') {
           filter.full_name_like = debouncedEmployeeSearch
         }
-        const page = await employeesApi.fetchEmployeesRegistry(filter, { size: 50, sort: 'fullName,asc' })
-        if (cancelled) return
+        const page = await employeesApi.fetchEmployeesRegistry(filter, { size: 200, sort: 'fullName,asc' })
+        if (cancelled) {
+          return
+        }
         let list = Array.isArray(page.content) ? page.content : []
         if (employeeIdFromJwt != null) {
           list = list.filter((e) => e.id !== employeeIdFromJwt)
         }
         setEmployeeSuggestions(list)
+        setSelectedEmployee((prev) => {
+          if (prev == null) {
+            return null
+          }
+          return list.some((e) => e.id === prev.id) ? prev : null
+        })
       } catch {
         if (!cancelled) {
           setEmployeeSuggestions([])
+          setSelectedEmployee(null)
         }
       } finally {
         if (!cancelled) {
@@ -189,7 +200,7 @@ export function DevelopmentPlanCreatePage() {
     return () => {
       cancelled = true
     }
-  }, [companyId, teamLeadDepartmentId, debouncedEmployeeSearch, employeeIdFromJwt])
+  }, [companyId, teamLeadDepartmentId, employeeIdFromJwt, debouncedEmployeeSearch])
 
   useEffect(() => {
     let cancelled = false
@@ -471,11 +482,11 @@ export function DevelopmentPlanCreatePage() {
                         onMouseDown={(ev) => {
                           ev.preventDefault()
                           setSelectedEmployee(emp)
-                          setEmployeeSearchInput(emp.full_name)
+                          setEmployeeSearchInput(typeof emp.full_name === 'string' ? emp.full_name : '')
                           setSuggestOpen(false)
                         }}
                       >
-                        {emp.full_name}
+                        {typeof emp.full_name === 'string' ? emp.full_name : `Сотрудник #${emp.id}`}
                       </button>
                     ))
                   )}

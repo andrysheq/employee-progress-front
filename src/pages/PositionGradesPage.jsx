@@ -8,6 +8,8 @@ import { InlineAlert } from '../components/ui/Alert.jsx'
 import { SelectDropdown } from '../components/ui/SelectDropdown.jsx'
 import { useDisplayWhileRefreshing } from '../hooks/useDisplayWhileRefreshing.js'
 import { cn } from '../lib/utils.js'
+import { useAuth } from '../auth/useAuth.js'
+import { canManageGradeModel } from '../auth/roleChecks.js'
 import './pages.css'
 import './EntityZone.css'
 
@@ -57,7 +59,8 @@ function toNullableInt(value) {
 
 export function PositionGradesPage() {
   const { companyId } = resolveCompanyId()
-  const canManage = true
+  const { roles } = useAuth()
+  const canManage = canManageGradeModel(roles)
 
   const params = useParams()
   const positionId = useMemo(() => {
@@ -474,7 +477,9 @@ export function PositionGradesPage() {
 
       <h1 className="page__title">Грейды по должности</h1>
       <p className="page__lead">
-        Просматривайте и редактируйте грейды выбранной должности в матрице грейдов.
+        {canManage
+          ? 'Просматривайте и редактируйте грейды выбранной должности в матрице грейдов.'
+          : 'Просматривайте грейды выбранной должности в матрице грейдов.'}
       </p>
 
       {position ? (

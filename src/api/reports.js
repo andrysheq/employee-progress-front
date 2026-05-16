@@ -71,7 +71,7 @@ import { apiGet } from './client.js'
  * @property {string} employee_name
  * @property {string} from_grade_code
  * @property {string | null} [to_grade_code]
- * @property {'APPROVED' | 'REJECTED' | string} decision
+ * @property {'APPROVED_BY_DEPARTMENT_DIRECTOR' | 'APPROVED_BY_GENERAL_DIRECTOR' | 'REJECTED' | string} decision
  * @property {string} rationale
  * @property {string | null} [improvement_plan_summary]
  * @property {number | null} [agreed_salary_rub_month]

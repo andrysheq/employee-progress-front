@@ -13,13 +13,23 @@ import './pages.css'
 import './EntityZone.css'
 
 const DECISION_LABEL = {
-  APPROVED: 'Одобрено',
+  APPROVED_BY_DEPARTMENT_DIRECTOR: 'Одобрено директором отдела',
+  APPROVED_BY_GENERAL_DIRECTOR: 'Одобрено генеральным директором',
   REJECTED: 'Отклонено',
 }
 
 const DECISION_FILTER_OPTIONS = [
   { value: '', label: 'Все' },
-  { value: 'APPROVED', label: 'Одобрено', description: 'Повышение согласовано' },
+  {
+    value: 'APPROVED_BY_DEPARTMENT_DIRECTOR',
+    label: 'Одобрено директором отдела',
+    description: 'Ожидает подписи генерального директора',
+  },
+  {
+    value: 'APPROVED_BY_GENERAL_DIRECTOR',
+    label: 'Одобрено генеральным директором',
+    description: 'Повышение утверждено',
+  },
   { value: 'REJECTED', label: 'Отклонено', description: 'Повышение не согласовано' },
 ]
 

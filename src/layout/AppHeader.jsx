@@ -1,6 +1,6 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { useEffect, useState } from 'react'
-import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth.js'
 import './AppShell.css'
 import './AppHeader.css'
@@ -27,7 +27,8 @@ export function AppHeader() {
   const navigate = useNavigate()
   const location = useLocation()
   const pathname = location.pathname
-  const { isAuthenticated, visibleNavItems, displayName, clearSession } = useAuth()
+  const { isAuthenticated, visibleNavItems, displayName, clearSession, employeeIdFromJwt } =
+    useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -40,12 +41,25 @@ export function AppHeader() {
   }
 
   const userName = displayName ?? 'Пользователь'
+  const profileHref = employeeIdFromJwt != null ? `/employees/${employeeIdFromJwt}` : null
 
   const toolsBlock = (
     <>
-      <span className="app-header__session" title={userName}>
-        {userName}
-      </span>
+      {profileHref != null ? (
+        <Link
+          to={profileHref}
+          className="app-header__session app-header__session--link"
+          title={userName}
+          aria-label={`Страница сотрудника: ${userName}`}
+          onClick={() => setMenuOpen(false)}
+        >
+          {userName}
+        </Link>
+      ) : (
+        <span className="app-header__session" title={userName}>
+          {userName}
+        </span>
+      )}
       <button type="button" className="ui-btn ui-btn--outline ui-btn--sm" onClick={onLogout}>
         Выйти
       </button>

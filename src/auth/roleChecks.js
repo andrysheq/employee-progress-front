@@ -60,10 +60,30 @@ export function hasGeneralDirectorRole(roles) {
   return roles.some((role) => GENERAL_DIRECTOR_ROLE_ALIASES.has(normalizeRole(role)))
 }
 
+export function hasDepartmentDirectorRole(roles) {
+  if (!Array.isArray(roles)) {
+    return false
+  }
+  const DEPARTMENT_DIRECTOR_ROLE_ALIASES = new Set([
+    'Директор отдела',
+    '1000',
+    'ROLE_DEPARTMENT_DIRECTOR',
+    'DEPARTMENT_DIRECTOR',
+  ])
+  return roles.some((role) => DEPARTMENT_DIRECTOR_ROLE_ALIASES.has(normalizeRole(role)))
+}
+
 /**
+ * Управление матрицей грейдов (должности, грейды, справочник компетенций, критерии): только директорам (1000, 1001).
+ * Тимлид и рядовой сотрудник — только просмотр.
+ *
  * @param {string[] | null | undefined} roles
  * @returns {boolean}
  */
+export function canManageGradeModel(roles) {
+  return hasDirectorRole(roles)
+}
+
 export function hasTeamLeadRole(roles) {
   if (!Array.isArray(roles)) {
     return false

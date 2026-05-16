@@ -8,6 +8,8 @@ import { InlineAlert } from '../components/ui/Alert.jsx'
 import { SpotlightCard } from '../components/ui/SpotlightCard.jsx'
 import { useDisplayWhileRefreshing } from '../hooks/useDisplayWhileRefreshing.js'
 import { cn } from '../lib/utils.js'
+import { useAuth } from '../auth/useAuth.js'
+import { canManageGradeModel } from '../auth/roleChecks.js'
 import './pages.css'
 import './EntityZone.css'
 
@@ -23,7 +25,8 @@ function trimToNull(value) {
 export function GradeModelPage() {
   const { companyId } = resolveCompanyId()
   const navigate = useNavigate()
-  const canManage = true
+  const { roles } = useAuth()
+  const canManage = canManageGradeModel(roles)
 
   const [onlyActive, setOnlyActive] = useState(true)
   const [loading, setLoading] = useState(false)

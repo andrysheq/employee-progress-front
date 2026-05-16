@@ -133,18 +133,18 @@ export function EmployeeDetailsPage() {
               <span>{formatDate(displayDetails.employee.hired_at)}</span>
               <span />
             </div>
-            <div className="entity-zone__grades-row">
-              <span>Оклад (₽/мес.)</span>
-              <span>
-                {displayDetails.employee.current_salary_redacted === true
-                  ? 'Недоступно для сотрудников других отделов'
-                  : displayDetails.employee.current_salary_rub_month != null &&
-                      displayDetails.employee.current_salary_rub_month !== ''
+            {displayDetails.employee.current_salary_redacted !== true ? (
+              <div className="entity-zone__grades-row">
+                <span>Оклад (₽/мес.)</span>
+                <span>
+                  {displayDetails.employee.current_salary_rub_month != null &&
+                  displayDetails.employee.current_salary_rub_month !== ''
                     ? Number(displayDetails.employee.current_salary_rub_month).toLocaleString('ru-RU')
                     : '—'}
-              </span>
-              <span />
-            </div>
+                </span>
+                <span />
+              </div>
+            ) : null}
           </div>
 
           <div className="entity-zone__matrix-block">
@@ -177,28 +177,26 @@ export function EmployeeDetailsPage() {
             )}
           </div>
 
-          <div className="entity-zone__matrix-block">
-            <h3 className="entity-zone__matrix-block-title">История грейдов</h3>
-            {displayDetails.gradeHistoryForbidden ? (
-              <p className="entity-zone__muted">
-                История грейдов недоступна для сотрудников других отделов.
-              </p>
-            ) : displayDetails.gradeHistory.length > 0 ? (
-              <div className="entity-zone__grades-table">
-                {displayDetails.gradeHistory.map((row) => (
-                  <div key={row.employee_grade_id} className="entity-zone__grades-row">
-                    <span>{row.grade_name}</span>
-                    <span>
-                      {formatDate(row.start_date)} - {formatDate(row.end_date)}
-                    </span>
-                    <span>Уровень {row.grade_level_order}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="entity-zone__muted">История грейдов отсутствует.</p>
-            )}
-          </div>
+          {!displayDetails.gradeHistoryForbidden ? (
+            <div className="entity-zone__matrix-block">
+              <h3 className="entity-zone__matrix-block-title">История грейдов</h3>
+              {displayDetails.gradeHistory.length > 0 ? (
+                <div className="entity-zone__grades-table">
+                  {displayDetails.gradeHistory.map((row) => (
+                    <div key={row.employee_grade_id} className="entity-zone__grades-row">
+                      <span>{row.grade_name}</span>
+                      <span>
+                        {formatDate(row.start_date)} - {formatDate(row.end_date)}
+                      </span>
+                      <span>Уровень {row.grade_level_order}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="entity-zone__muted">История грейдов отсутствует.</p>
+              )}
+            </div>
+          ) : null}
         </section>
         </div>
       ) : null}

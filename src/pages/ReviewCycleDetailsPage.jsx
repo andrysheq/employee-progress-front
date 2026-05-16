@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, employeesApi, gradeModelApi, promotionDecisionsApi, reviewCyclesApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
-import { hasDirectorRole } from '../auth/roleChecks.js'
+import { hasDepartmentDirectorRole, hasDirectorRole, hasGeneralDirectorRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
 import { InlineAlert } from '../components/ui/Alert.jsx'
@@ -21,7 +21,8 @@ const STATUS_LABEL = {
 }
 
 const DECISION_LABEL = {
-  APPROVED: 'Повышение одобрено',
+  APPROVED_BY_DEPARTMENT_DIRECTOR: 'Одобрено директором отдела',
+  APPROVED_BY_GENERAL_DIRECTOR: 'Одобрено генеральным директором',
   REJECTED: 'Повышение отклонено',
 }
 
@@ -108,7 +109,7 @@ function formatEmployeeCurrentSalaryDisplay(emp) {
     return 'не зафиксирован'
   }
   if (emp.current_salary_redacted === true) {
-    return 'недоступен (другой отдел)'
+    return 'недоступен'
   }
   return formatRubAmount(emp.current_salary_rub_month) ?? 'не зафиксирован'
 }
@@ -118,6 +119,8 @@ export function ReviewCycleDetailsPage() {
   const { companyId } = resolveCompanyId()
   const { roles, employeeIdFromJwt } = useAuth()
   const canActAsDirector = hasDirectorRole(roles)
+  const canActAsDepartmentDirector = hasDepartmentDirectorRole(roles)
+  const canActAsGeneralDirector = hasGeneralDirectorRole(roles)
 
   const [cycle, setCycle] = useState(/** @type {import('../api/reviewCycles.js').ReviewCycleView | null} */ (null))
   const [scheduleHistory, setScheduleHistory] = useState(
@@ -147,6 +150,10 @@ export function ReviewCycleDetailsPage() {
   const [directorModal, setDirectorModal] = useState(/** @type {'approve' | 'reject' | null} */ (null))
   const [modalSalaryRub, setModalSalaryRub] = useState('')
   const [modalError, setModalError] = useState(/** @type {string | null} */ (null))
+  const [generalDirectorModal, setGeneralDirectorModal] = useState(/** @type {'approve' | 'reject' | null} */ (null))
+  const [gdRationale, setGdRationale] = useState('')
+  const [gdImprovementPlanSummary, setGdImprovementPlanSummary] = useState('')
+  const [gdModalError, setGdModalError] = useState(/** @type {string | null} */ (null))
 
   const [actionBusy, setActionBusy] = useState(false)
   const [actionError, setActionError] = useState(/** @type {string | null} */ (null))
@@ -289,7 +296,7 @@ export function ReviewCycleDetailsPage() {
       setTargetGradeId('')
 
       if (
-        !canActAsDirector ||
+        !canActAsDepartmentDirector ||
         !cycle ||
         String(cycle.review_type).toUpperCase() !== 'FINAL_PROMOTION' ||
         String(cycle.status).toUpperCase() !== 'SCHEDULED' ||
@@ -356,7 +363,7 @@ export function ReviewCycleDetailsPage() {
     return () => {
       cancelled = true
     }
-  }, [canActAsDirector, cycle, companyId])
+  }, [canActAsDepartmentDirector, cycle, companyId])
 
   const employeeNameById = useMemo(() => {
     const m = new Map()
@@ -375,11 +382,23 @@ export function ReviewCycleDetailsPage() {
     return planIds.filter((pid) => pid !== cycle.plan_id)
   }, [planIds, cycle])
 
+  const deptAwaitingGeneralDirector = useMemo(() => {
+    if (!linkedDecision) {
+      return false
+    }
+    return String(linkedDecision.decision).toUpperCase() === 'APPROVED_BY_DEPARTMENT_DIRECTOR'
+  }, [linkedDecision])
+
   const reviewTypeKey = cycle ? String(cycle.review_type).toUpperCase() : ''
   const statusKey = cycle ? String(cycle.status).toUpperCase() : ''
   const isFinalPromotion = reviewTypeKey === 'FINAL_PROMOTION'
   const isScheduled = statusKey === 'SCHEDULED'
-  const showDirectorActions = canActAsDirector && isFinalPromotion && isScheduled && linkedDecision == null
+  const showPromotionMeetingToolbar =
+    canActAsDirector && isFinalPromotion && isScheduled && (linkedDecision == null || deptAwaitingGeneralDirector)
+  const showDepartmentDirectorPromotionActions =
+    canActAsDepartmentDirector && isFinalPromotion && isScheduled && linkedDecision == null
+  const showGeneralDirectorPromotionActions =
+    canActAsGeneralDirector && isFinalPromotion && isScheduled && deptAwaitingGeneralDirector
 
   const selectedTargetGrade = useMemo(() => {
     if (!targetGradeId) {
@@ -415,8 +434,31 @@ export function ReviewCycleDetailsPage() {
     setModalError(null)
   }, [])
 
+  const closeGeneralDirectorModal = useCallback(() => {
+    setGeneralDirectorModal(null)
+    setGdModalError(null)
+  }, [])
+
+  const openGdApproveModal = useCallback(() => {
+    setDirectorModal(null)
+    setActiveAction(null)
+    setGdModalError(null)
+    setGdRationale('')
+    setGdImprovementPlanSummary('')
+    setGeneralDirectorModal('approve')
+  }, [])
+
+  const openGdRejectModal = useCallback(() => {
+    setDirectorModal(null)
+    setActiveAction(null)
+    setGdModalError(null)
+    setGdRationale('')
+    setGdImprovementPlanSummary('')
+    setGeneralDirectorModal('reject')
+  }, [])
+
   /**
-   * @param {'APPROVED' | 'REJECTED'} decisionType
+   * @param {'APPROVED_BY_DEPARTMENT_DIRECTOR' | 'REJECTED'} decisionType
    */
   async function submitDirectorDecision(decisionType) {
     if (!cycle || employeeIdFromJwt == null) {
@@ -428,7 +470,7 @@ export function ReviewCycleDetailsPage() {
       setModalError('Укажите обоснование решения.')
       return
     }
-    if (decisionType === 'APPROVED' && targetGradeId === '') {
+    if (decisionType === 'APPROVED_BY_DEPARTMENT_DIRECTOR' && targetGradeId === '') {
       setModalError('Выберите целевой грейд для одобрения повышения.')
       return
     }
@@ -438,7 +480,7 @@ export function ReviewCycleDetailsPage() {
     }
     /** @type {number | null} */
     let agreedSalaryRubMonth = null
-    if (decisionType === 'APPROVED') {
+    if (decisionType === 'APPROVED_BY_DEPARTMENT_DIRECTOR') {
       const raw = modalSalaryRub.trim().replace(/\s/g, '')
       if (raw === '') {
         setModalError('Укажите согласованный оклад (руб./мес.).')
@@ -465,7 +507,7 @@ export function ReviewCycleDetailsPage() {
       const result = await reviewCyclesApi.makeFinalPromotionDecision(cycle.review_cycle_id, {
         director_employee_id: employeeIdFromJwt,
         decision: decisionType,
-        target_grade_id: decisionType === 'APPROVED' ? Number(targetGradeId) : null,
+        target_grade_id: decisionType === 'APPROVED_BY_DEPARTMENT_DIRECTOR' ? Number(targetGradeId) : null,
         rationale: trimmedRationale,
         improvement_plan_summary: decisionType === 'REJECTED' ? improvementPlanSummary.trim() : null,
         agreed_salary_rub_month: agreedSalaryRubMonth,
@@ -495,6 +537,65 @@ export function ReviewCycleDetailsPage() {
       if (e instanceof ApiError) setModalError(e.message)
       else if (e instanceof Error) setModalError(e.message)
       else setModalError('Не удалось зафиксировать кадровое решение')
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  /**
+   * @param {'APPROVED_BY_GENERAL_DIRECTOR' | 'REJECTED'} decisionType
+   */
+  async function submitGeneralDirectorDecision(decisionType) {
+    if (!cycle || employeeIdFromJwt == null) {
+      setGdModalError('Не удалось определить сотрудника в сессии.')
+      return
+    }
+    const trimmed = gdRationale.trim()
+    if (trimmed === '') {
+      setGdModalError('Укажите обоснование решения.')
+      return
+    }
+    if (decisionType === 'REJECTED' && gdImprovementPlanSummary.trim() === '') {
+      setGdModalError('Укажите план доработки. После отказа повышение не будет зафиксировано.')
+      return
+    }
+    setActionBusy(true)
+    setActionError(null)
+    setActionInfo(null)
+    setGdModalError(null)
+    setPromotionDecisionAdvisory(null)
+    try {
+      const result = await reviewCyclesApi.confirmGeneralDirectorPromotionDecision(cycle.review_cycle_id, {
+        general_director_employee_id: employeeIdFromJwt,
+        decision: decisionType,
+        rationale: trimmed,
+        improvement_plan_summary: decisionType === 'REJECTED' ? gdImprovementPlanSummary.trim() : null,
+      })
+      await reloadCycle()
+      const list = await promotionDecisionsApi.fetchPromotionDecisions({
+        review_cycle_id: cycle.review_cycle_id,
+      })
+      setLinkedDecision(Array.isArray(list) && list.length > 0 ? list[0] : null)
+      setActionInfo(`Решение генерального директора зафиксировано (№${result.promotion_decision_id}).`)
+      const advisories = Array.isArray(result.policy_advisories) ? [...result.policy_advisories] : []
+      const wRaw = result.weighted_score_advisory
+      let weightedNum = null
+      if (wRaw != null && wRaw !== '') {
+        const n = Number(wRaw)
+        if (Number.isFinite(n)) {
+          weightedNum = n
+        }
+      }
+      setPromotionDecisionAdvisory({
+        weightedScoreAdvisory: weightedNum,
+        policyCompliant: result.policy_compliant === true,
+        policyAdvisories: advisories,
+      })
+      closeGeneralDirectorModal()
+    } catch (e) {
+      if (e instanceof ApiError) setGdModalError(e.message)
+      else if (e instanceof Error) setGdModalError(e.message)
+      else setGdModalError('Не удалось зафиксировать решение генерального директора')
     } finally {
       setActionBusy(false)
     }
@@ -588,7 +689,8 @@ export function ReviewCycleDetailsPage() {
                     Открыть карточку решения
                   </Link>
                 </p>
-                {String(linkedDecision.decision).toUpperCase() === 'APPROVED' &&
+                {(String(linkedDecision.decision).toUpperCase() === 'APPROVED_BY_DEPARTMENT_DIRECTOR' ||
+                  String(linkedDecision.decision).toUpperCase() === 'APPROVED_BY_GENERAL_DIRECTOR') &&
                 linkedDecision.agreed_salary_rub_month != null &&
                 linkedDecision.agreed_salary_rub_month !== '' ? (
                   <p className="entity-zone__idp-muted" style={{ marginTop: '0.35rem' }}>
@@ -629,10 +731,8 @@ export function ReviewCycleDetailsPage() {
             </section>
           ) : null}
 
-          {canActAsDirector && isFinalPromotion && isScheduled ? (
-            <section className="entity-zone__idp-section">
-              <h2 className="entity-zone__idp-section-title">Действия директора</h2>
-
+          {(showPromotionMeetingToolbar || showGeneralDirectorPromotionActions) ? (
+            <>
               {actionError ? (
                 <InlineAlert variant="error" className="ui-alert--mb-sm">
                   {actionError}
@@ -644,53 +744,88 @@ export function ReviewCycleDetailsPage() {
                 </p>
               ) : null}
 
-              {showDirectorActions ? (
-                <div className="entity-zone__filters">
-                  <p className="entity-zone__idp-muted" style={{ gridColumn: '1 / -1' }}>
-                    Изучите связанные ИПР, проведите встречу, затем выберите действие ниже.
+              {showPromotionMeetingToolbar ? (
+                <section className="entity-zone__idp-section">
+                  <h2 className="entity-zone__idp-section-title">Управление собеседованием</h2>
+                  <div className="entity-zone__filters">
+                    {showDepartmentDirectorPromotionActions ? (
+                      <p className="entity-zone__idp-muted" style={{ gridColumn: '1 / -1' }}>
+                        Изучите связанные ИПР, проведите встречу, затем согласуйте грейд и оклад. Они применятся к сотруднику только
+                        после подписи генерального директора.
+                      </p>
+                    ) : deptAwaitingGeneralDirector ? (
+                      <p className="entity-zone__idp-muted" style={{ gridColumn: '1 / -1' }}>
+                        Решение директора отдела зафиксировано и ожидает подписи генерального директора. Перенос даты всё ещё возможен.
+                      </p>
+                    ) : (
+                      <p className="entity-zone__idp-muted" style={{ gridColumn: '1 / -1' }}>
+                        При необходимости перенесите дату собеседования.
+                      </p>
+                    )}
+                    <div className="entity-zone__actions entity-zone__actions--idp-tl" style={{ gridColumn: '1 / -1', marginBottom: '0.5rem' }}>
+                      <button type="button" className="entity-zone__button" disabled={actionBusy} onClick={() => setActiveAction('reschedule')}>
+                        Перенести собеседование
+                      </button>
+                      {showDepartmentDirectorPromotionActions ? (
+                        <>
+                          <button type="button" className="entity-zone__button" disabled={actionBusy} onClick={openRejectDecisionModal}>
+                            Отклонить повышение
+                          </button>
+                          <button
+                            type="button"
+                            className="entity-zone__button entity-zone__button--primary"
+                            disabled={actionBusy || gradeOptionsLoading}
+                            onClick={openApproveDecisionModal}
+                          >
+                            Согласовать грейд и оклад
+                          </button>
+                        </>
+                      ) : null}
+                    </div>
+
+                    {activeAction === 'reschedule' ? (
+                      <div className="entity-zone__filters entity-zone__filters--reschedule-row">
+                        <label className="entity-zone__field entity-zone__field--reschedule-datetime">
+                          <span className="entity-zone__field-label">Новая дата и время</span>
+                          <input className="entity-zone__input" type="datetime-local" value={rescheduleAt} onChange={(ev) => setRescheduleAt(ev.target.value)} disabled={actionBusy} />
+                        </label>
+                        <label className="entity-zone__field entity-zone__field--grow">
+                          <span className="entity-zone__field-label">Комментарий</span>
+                          <input className="entity-zone__input" value={rescheduleComment} onChange={(ev) => setRescheduleComment(ev.target.value)} disabled={actionBusy} />
+                        </label>
+                        <label className="entity-zone__field entity-zone__field--reschedule-submit">
+                          <span className="entity-zone__field-label" aria-hidden="true">
+                            {'\u00a0'}
+                          </span>
+                          <div className="entity-zone__actions entity-zone__actions--reschedule-submit">
+                            <button type="button" className="entity-zone__button entity-zone__button--primary" disabled={actionBusy} onClick={() => void handleReschedule()}>
+                              Подтвердить
+                            </button>
+                          </div>
+                        </label>
+                      </div>
+                    ) : null}
+                  </div>
+                </section>
+              ) : null}
+
+              {showGeneralDirectorPromotionActions ? (
+                <section className="entity-zone__idp-section">
+                  <h2 className="entity-zone__idp-section-title">Решение генерального директора</h2>
+                  <p className="entity-zone__idp-muted" style={{ marginBottom: '0.75rem' }}>
+                    Директор отдела согласовал целевой грейд и оклад. Подтвердите итоговое повышение или отклоните решение.
                   </p>
-                  <div className="entity-zone__actions entity-zone__actions--idp-tl" style={{ gridColumn: '1 / -1', marginBottom: '0.5rem' }}>
-                    <button type="button" className="entity-zone__button" disabled={actionBusy} onClick={() => setActiveAction('reschedule')}>
-                      Перенести собеседование
+                  <div className="entity-zone__actions entity-zone__actions--idp-tl">
+                    <button type="button" className="entity-zone__button" disabled={actionBusy} onClick={openGdRejectModal}>
+                      Отклонить
                     </button>
-                    <button type="button" className="entity-zone__button" disabled={actionBusy} onClick={openRejectDecisionModal}>
-                      Отклонить повышение
-                    </button>
-                    <button
-                      type="button"
-                      className="entity-zone__button entity-zone__button--primary"
-                      disabled={actionBusy || gradeOptionsLoading}
-                      onClick={openApproveDecisionModal}
-                    >
-                      Одобрить повышение
+                    <button type="button" className="entity-zone__button entity-zone__button--primary" disabled={actionBusy} onClick={openGdApproveModal}>
+                      Подтвердить повышение
                     </button>
                   </div>
-
-                  {activeAction === 'reschedule' ? (
-                    <div className="entity-zone__filters entity-zone__filters--reschedule-row">
-                      <label className="entity-zone__field entity-zone__field--reschedule-datetime">
-                        <span className="entity-zone__field-label">Новая дата и время</span>
-                        <input className="entity-zone__input" type="datetime-local" value={rescheduleAt} onChange={(ev) => setRescheduleAt(ev.target.value)} disabled={actionBusy} />
-                      </label>
-                      <label className="entity-zone__field entity-zone__field--grow">
-                        <span className="entity-zone__field-label">Комментарий</span>
-                        <input className="entity-zone__input" value={rescheduleComment} onChange={(ev) => setRescheduleComment(ev.target.value)} disabled={actionBusy} />
-                      </label>
-                      <label className="entity-zone__field entity-zone__field--reschedule-submit">
-                        <span className="entity-zone__field-label" aria-hidden="true">
-                          {'\u00a0'}
-                        </span>
-                        <div className="entity-zone__actions entity-zone__actions--reschedule-submit">
-                          <button type="button" className="entity-zone__button entity-zone__button--primary" disabled={actionBusy} onClick={() => void handleReschedule()}>
-                            Подтвердить
-                          </button>
-                        </div>
-                      </label>
-                    </div>
-                  ) : null}
-                </div>
+                </section>
               ) : null}
-            </section>
+            </>
           ) : null}
 
           <section className="entity-zone__idp-section">
@@ -779,7 +914,7 @@ export function ReviewCycleDetailsPage() {
           >
             <div className="entity-zone__modal-head">
               <h3 id="director-decision-modal-title" className="entity-zone__modal-title">
-                {directorModal === 'approve' ? 'Одобрение повышения' : 'Отклонение повышения'}
+                {directorModal === 'approve' ? 'Решение директора отдела' : 'Отклонение повышения'}
               </h3>
               <button type="button" className="entity-zone__icon-button" onClick={closeDirectorModal} aria-label="Закрыть" disabled={actionBusy}>
                 {'\u00D7'}
@@ -790,6 +925,9 @@ export function ReviewCycleDetailsPage() {
 
             {directorModal === 'approve' ? (
               <div className="entity-zone__filters">
+                <p className="entity-zone__idp-muted" style={{ gridColumn: '1 / -1' }}>
+                  Для сотрудника грейд и оклад изменятся только после подписи генерального директора.
+                </p>
                 <p className="entity-zone__idp-muted" style={{ gridColumn: '1 / -1' }}>
                   Текущий оклад сотрудника: <strong>{formatEmployeeCurrentSalaryDisplay(subjectEmployee)}</strong>
                 </p>
@@ -843,9 +981,9 @@ export function ReviewCycleDetailsPage() {
                     type="button"
                     className="entity-zone__button entity-zone__button--primary"
                     disabled={actionBusy}
-                    onClick={() => void submitDirectorDecision('APPROVED')}
+                    onClick={() => void submitDirectorDecision('APPROVED_BY_DEPARTMENT_DIRECTOR')}
                   >
-                    Одобрить
+                    Зафиксировать согласование
                   </button>
                 </div>
               </div>
@@ -879,6 +1017,102 @@ export function ReviewCycleDetailsPage() {
                     onClick={() => void submitDirectorDecision('REJECTED')}
                   >
                     Зафиксировать отклонение
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+      ) : null}
+
+      {generalDirectorModal && cycle && linkedDecision ? (
+        <div
+          className="entity-zone__modal-backdrop"
+          role="presentation"
+          onClick={() => {
+            if (!actionBusy) {
+              closeGeneralDirectorModal()
+            }
+          }}
+        >
+          <section
+            className="entity-zone__modal entity-zone__modal--wide"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gd-decision-modal-title"
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <div className="entity-zone__modal-head">
+              <h3 id="gd-decision-modal-title" className="entity-zone__modal-title">
+                {generalDirectorModal === 'approve' ? 'Подтверждение повышения' : 'Отказ от повышения'}
+              </h3>
+              <button type="button" className="entity-zone__icon-button" onClick={closeGeneralDirectorModal} aria-label="Закрыть" disabled={actionBusy}>
+                {'\u00D7'}
+              </button>
+            </div>
+
+            {gdModalError ? <InlineAlert variant="error" className="ui-alert--mb-sm">{gdModalError}</InlineAlert> : null}
+
+            {generalDirectorModal === 'approve' ? (
+              <div className="entity-zone__filters">
+                <p className="entity-zone__idp-muted" style={{ gridColumn: '1 / -1' }}>
+                  Предложение директора отдела: целевой грейд <strong>{linkedDecision.to_grade_code ?? '—'}</strong>
+                  {linkedDecision.agreed_salary_rub_month != null && linkedDecision.agreed_salary_rub_month !== '' ? (
+                    <>
+                      {', оклад '}
+                      <strong>{formatRubAmount(linkedDecision.agreed_salary_rub_month)}</strong>
+                    </>
+                  ) : null}
+                  . После подтверждения они будут применены к сотруднику.
+                </p>
+                <p className="entity-zone__idp-muted" style={{ gridColumn: '1 / -1' }}>
+                  Обоснование директора отдела: <em style={{ whiteSpace: 'pre-wrap' }}>{linkedDecision.rationale || '—'}</em>
+                </p>
+                <label className="entity-zone__field entity-zone__field--grow" style={{ gridColumn: '1 / -1' }}>
+                  <span className="entity-zone__field-label">Обоснование генерального директора</span>
+                  <textarea className="entity-zone__input" rows={3} value={gdRationale} onChange={(ev) => setGdRationale(ev.target.value)} disabled={actionBusy} />
+                </label>
+                <div className="entity-zone__actions" style={{ gridColumn: '1 / -1' }}>
+                  <button type="button" className="entity-zone__button" disabled={actionBusy} onClick={closeGeneralDirectorModal}>
+                    Отмена
+                  </button>
+                  <button
+                    type="button"
+                    className="entity-zone__button entity-zone__button--primary"
+                    disabled={actionBusy}
+                    onClick={() => void submitGeneralDirectorDecision('APPROVED_BY_GENERAL_DIRECTOR')}
+                  >
+                    Подтвердить и применить
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="entity-zone__filters">
+                <label className="entity-zone__field entity-zone__field--grow" style={{ gridColumn: '1 / -1' }}>
+                  <span className="entity-zone__field-label">План доработки</span>
+                  <textarea
+                    className="entity-zone__input"
+                    rows={3}
+                    value={gdImprovementPlanSummary}
+                    onChange={(ev) => setGdImprovementPlanSummary(ev.target.value)}
+                    disabled={actionBusy}
+                  />
+                </label>
+                <label className="entity-zone__field entity-zone__field--grow" style={{ gridColumn: '1 / -1' }}>
+                  <span className="entity-zone__field-label">Обоснование отказа</span>
+                  <textarea className="entity-zone__input" rows={3} value={gdRationale} onChange={(ev) => setGdRationale(ev.target.value)} disabled={actionBusy} />
+                </label>
+                <div className="entity-zone__actions" style={{ gridColumn: '1 / -1' }}>
+                  <button type="button" className="entity-zone__button" disabled={actionBusy} onClick={closeGeneralDirectorModal}>
+                    Отмена
+                  </button>
+                  <button
+                    type="button"
+                    className="entity-zone__button entity-zone__button--primary"
+                    disabled={actionBusy}
+                    onClick={() => void submitGeneralDirectorDecision('REJECTED')}
+                  >
+                    Зафиксировать отказ
                   </button>
                 </div>
               </div>

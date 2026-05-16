@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, employeesApi, reviewCyclesApi } from '../api/index.js'
 import { useAuth } from '../auth/useAuth.js'
-import { hasDirectorRole, hasGeneralDirectorRole } from '../auth/roleChecks.js'
+import { hasDirectorRole, hasEmployeeRole, hasGeneralDirectorRole, hasTeamLeadRole } from '../auth/roleChecks.js'
 import { resolveCompanyId } from '../config/companyContext.js'
 import { formatDateTimeRuNoSeconds } from '../utils/dateFormat.js'
 import { InlineAlert } from '../components/ui/Alert.jsx'
@@ -59,6 +59,11 @@ export function ReviewsPage() {
   const { roles, employeeIdFromJwt } = useAuth()
   const canScheduleFinalReview = hasDirectorRole(roles)
   const isGeneralDirector = hasGeneralDirectorRole(roles)
+  const restrictReviewsUiToSelf =
+    hasEmployeeRole(roles) &&
+    !hasDirectorRole(roles) &&
+    !hasGeneralDirectorRole(roles) &&
+    !hasTeamLeadRole(roles)
 
   const [myDepartmentId, setMyDepartmentId] = useState(/** @type {number | null} */ (null))
   const [myDepartmentLookupDone, setMyDepartmentLookupDone] = useState(() => employeeIdFromJwt == null)
@@ -315,7 +320,11 @@ export function ReviewsPage() {
       </ol>
 
       <h1 className="page__title">Собеседования</h1>
-      <p className="page__lead">Плановые и завершённые собеседования на повышение. Нажмите на карточку, чтобы открыть детали.</p>
+      <p className="page__lead">
+        {restrictReviewsUiToSelf
+          ? 'Ваши запланированные и завершённые собеседования на повышение. Нажмите на карточку, чтобы открыть детали.'
+          : 'Плановые и завершённые собеседования на повышение. Нажмите на карточку, чтобы открыть детали.'}
+      </p>
 
       {companyId == null ? (
         <InlineAlert variant="warning" role="status">
@@ -444,6 +453,7 @@ export function ReviewsPage() {
           void load()
         }}
       >
+        {!restrictReviewsUiToSelf ? (
         <label className="entity-zone__field entity-zone__field--grow">
           <span className="entity-zone__field-label">Сотрудник (поиск по ФИО)</span>
           <input
@@ -453,6 +463,7 @@ export function ReviewsPage() {
             placeholder="Например: Петров"
           />
         </label>
+        ) : null}
         <label className="entity-zone__field">
           <span className="entity-zone__field-label">Статус</span>
           <SelectDropdown value={status} onChange={setStatus} options={STATUS_FILTER_OPTIONS} />

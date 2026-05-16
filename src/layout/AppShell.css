@@ -68,6 +68,16 @@
   line-height: 1.3;
 }
 
+a.app-header__session--link {
+  cursor: pointer;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.app-header__session--link:hover {
+  text-decoration: underline;
+}
+
 .app-main {
   flex: 1;
   box-sizing: border-box;
